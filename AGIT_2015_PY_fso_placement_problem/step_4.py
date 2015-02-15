@@ -27,9 +27,9 @@ class Step_4:
     print "connected:",nx.is_connected(g)
     print "num_edges:",g.number_of_edges()
     
-    for n in g.nodes():
+    for n in g.nodes(data=True):
       print n 
-    for e in g.edges():
+    for e in g.edges(data=True):
       print e
       
   def make_problem_instance(self,
@@ -92,9 +92,23 @@ class Step_4:
     print "sources:",self.sources
     print "sinks:",self.sinks
     
-    self.print_graph(self.g1)
-    self.print_graph(self.g)
+    #self.print_graph(self.g1)
+    #self.print_graph(self.g)
     
+  def add_capacity(self, g, src_list=None,  snk_list = None, capacity=10.0):
+    if src_list == None: src_list=self.sources
+    if snk_list == None: snk_list=self.sinks
+    edge_set =  g.edges()
+    for x,y in edge_set:
+      g.edge[x][y]['capacity'] = capacity
+    #now override the supersrc-->src capacities and sink-->supersink capacities
+
+    for n in src_list:
+      g.edge['src'][n]['capacity'] = float('inf')
+    
+    for n in snk_list:
+      g.edge[n]['snk']['capacity'] = float('inf')
+     
 if __name__ == '__main__':
   print "starting run..."
   
@@ -111,6 +125,22 @@ if __name__ == '__main__':
                             num_source, 
                             num_sink,
                             input_graph_node_time)
+  
+  capacity = 10.0
+  s_4.add_capacity(s_4.g1)
+  #now run the max_flow
+  K= s_4.g1.to_directed()
+  ets =  K.edges(K.nodes(),'capacity')
+  for e in ets:
+    print e
+  flow_value, flow_dict = nx.maximum_flow(K, 'src', 'snk')
+  print flow_value
+  for i in flow_dict:
+    for j in flow_dict[i]:
+      print "(",i,",",j,"): ",flow_dict[i][j]
+
+  #s_4.print_graph(s_4.g1)
+  
   
   
   
