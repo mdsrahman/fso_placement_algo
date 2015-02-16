@@ -1,0 +1,155 @@
+%%This is a very basic article template.
+%%There is just one section and two subsections.
+\documentclass[letterpaper, 12pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[left=0.7in, right= 0.7in]{geometry}
+\usepackage{color}
+\newcommand{\blue}[1]{\textcolor{blue}{#1}}
+
+
+
+\begin{document}
+\section*{ILP Formulation}
+\subsection*{Basic Equations/Notations: }Let $x_{i}$ be a node and $e_{ij}$ be
+an edge (incident with nodes $x_i$ and $x_j$) in the original input network. 
+\begin{equation}
+	\forall i \mbox{ } 0 \leq x_i \leq 1 
+\end{equation} 
+\indent if $x_i$ is a feasible location (as computed from the map data) for a
+base station, then $x_i$ can be 1
+\begin{equation}
+	\forall i,j \mbox{ } 0 \leq e_{ij} \leq 1 
+\end{equation} 
+\indent if node $x_i$ and $x_j$ are in line-of-sight (as computed
+	from the map data) with each other, then $e_{ij}$ can be 1.\\
+The backbone-graph is a subgraph of the above graph and is denoted by node set
+$\{y_i\}$ and edge-set $\{b_{ij}\}$. From the subgraph property:
+\begin{equation}
+	\forall i \mbox{ } 0 \leq y_{i} \leq x_{i}
+\end{equation}
+\begin{equation}
+	%\forall i,j\mbox{ : } 
+	\forall i,j \mbox{ } 0 \leq b_{ij} \leq e_{ij}
+\end{equation}
+To enforce symmetry:
+\begin{equation}
+	\forall i,j \mbox{ } e_{ij} = e_{ji}
+\end{equation}
+\begin{equation}
+	\forall i,j \mbox{ } b_{ij} = b_{ji}
+\end{equation}
+To enforce edge-incidence:
+\begin{equation}
+	\forall i,j \mbox{ } e_{ij} \leq \frac{1}{2}(x_i + x_j)
+\end{equation}
+\begin{equation}
+	\forall i,j \mbox{ } b_{ij} \leq \frac{1}{2}(y_i + y_j)
+\end{equation}
+%Here, variables $x_i$, $y_i$, $e_{ij}$ and $b_{ij}$ have integer values 0 or 1. 
+%\\ 
+\subsection*{Requirements: }a) Each area is covered by at least one node in the
+backbone, here $T_{ij}$ is 1 if target $j$ is covered by a node $i$:
+%let this set of nodes be $T$ (we already computed this set in step
+%(i) heuristic set cover algorithm). So, we want each of these nodes to be
+%included in the backbone graph:
+\begin{equation}
+	\forall \mbox{ target }j,    \sum_{i \; \mid \; T_{ij} = 1}   y_i   \geq   1
+\end{equation}
+or in variable notations:
+\begin{equation*}
+	\forall \mbox{ target }j,    \sum_i   (T_{ij} \times y_i)   \geq   1
+\end{equation*}
+b) The backbone must be a connected graph with all the sink/gateway nodes in $W$
+and all the source nodes in $T$. To enforce connectivity, we set up a flow problem
+
+as follows: \\
+\indent we add two nodes, a super-source node $s$ and a supersink node $t$
+and make them part of the backbone node. We also add an edge from the supersource to
+each source node and an edge from each sink node to the supersink:
+%\begin{equation}
+%	x_s = x_t = y_s = y_t = 1
+%\end{equation}
+%\begin{equation}
+%	\forall y_i \in T \mbox{ : } e_{si} = b_{si} = 1
+%\end{equation}
+%\begin{equation}
+%	\forall y_i \in W \mbox{ : } e_{iw} = b_{iw} = 1
+%\end{equation}
+\begin{equation}
+	\forall i\mbox{ } 0 \leq  e_{si} \leq x_i
+\end{equation}
+\begin{equation}
+	\forall i\mbox{ } 0 \leq b_{si} \leq y_i
+\end{equation}
+\begin{equation}
+ 	\forall w \in W\mbox{ } e_{wt} = 1
+\end{equation}
+
+\blue{Note that we do {\em not} define variables $e_{st}, e_{is}, e_{ti}$ and the corresponding $b_{st}, b_{is}, b_{ti}$, and thats fine!}
+
+There is a nonzero flow from $s$ to each source (\blue{adding the correct upper bound too}):
+node:
+\begin{equation}
+	\forall i, \mbox{ } N y_i \geq f_{si} \geq \frac{y_{i}}{N} \mbox{, where N is a very large number}
+\end{equation}
+
+All the flow must go through the backbone edges:
+\begin{equation}
+	\forall i,j \mbox{ : }f_{ij} \leq b_{ij}
+\end{equation}
+The total flow from $s$ must equal to that of to $t$:
+\begin{equation}
+	\sum_i f_{si} = \sum_j f_{jt}
+\end{equation} 
+
+Also the flows must be conserved (\blue{included $s$ and $t$ in the summation}):
+\begin{equation}
+	\forall j \mbox{ : } \sum_{i \cup \{s\}} f_{ij} = \sum_{i \cup \{t\}} f_{ji}
+\end{equation}
+\subsection*{Constraints:} a) The number of node in the network graph is bounded
+by a given parameter:
+\begin{equation}
+	\sum_i x_i \leq n_{max}
+\end{equation}
+b) The node degree (except for the \textbf{\blue{gateway} nodes}) of the backbone graph is
+also bounded by a given parameter:
+\begin{equation}
+	\forall i \mid i \notin W \mbox{ } \sum_j b_{ij}  \leq d_{max}
+\end{equation}
+\subsection*{Objective}
+Maximize the total flow from the supersource to the supersink in the network
+graph. Let the flow in link $e_{ij}$ be $g_{ij}$. The flow constraint equations
+can be formulated as follows:\\
+The total flow from $s$ must equal to that of to $t$:
+\begin{equation}
+	\sum_i g_{si} = \sum_j g_{jt}
+\end{equation}
+Also the flows must be conserved (\blue{included $s,t$ in the summation}):
+\begin{equation}
+	\forall j \mbox{  } \sum_{i\cup\{s\}} g_{ij} = \sum_{i\cup\{t\}} g_{ji}
+\end{equation}
+{%\color{red}
+The link capacity must not be exceeded:
+\begin{equation}
+	\forall i,j \mbox{  } 0 \leq \mbox{ } g_{ij} \leq e_{ij}
+\end{equation}
+
+\blue{Adding upper bounds to links connecting to $s$ and $t$, so that
+  the links connecting $s$ to non-selected nodes have zero flow and
+  similarly for $t$. Technically, the below equations are not really
+  needed, since the flow conversation at internal nodes will ensure
+  this for ILP -- but, in the LP relaxation, the below equations will
+  give us a tighter bound.}
+
+\begin{equation}
+	\forall i \mbox{ } N x_i \geq f_{si} \mbox{, where N is a very large number} 
+\end{equation}
+\begin{equation}
+	\forall i \mbox{ } N x_i \geq f_{it} \mbox{, where N is a very large number} 
+\end{equation}
+}
+The objective function is:
+\begin{equation}
+	\mathbf{max} \mbox{ : }\sum_i g_{si}
+\end{equation}
+\end{document}
