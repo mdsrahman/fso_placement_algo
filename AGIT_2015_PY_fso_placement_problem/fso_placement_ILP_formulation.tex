@@ -9,24 +9,23 @@
 \subsection*{Basic Equations/Notations: }Let $x_{i}$ be a node and $e_{ij}$ be
 an edge (incident with nodes $x_i$ and $x_j$) in the original input network. 
 \begin{equation}
-	0 \leq x_i \leq 1 
+	\forall i \mbox{ } 0 \leq x_i \leq 1 
 \end{equation} 
 \indent if $x_i$ is a feasible location (as computed from the map data) for a
 base station, then $x_i$ can be 1
 \begin{equation}
-	0 \leq e_{ij} \leq 1 
+	\forall i,j \mbox{ } 0 \leq e_{ij} \leq 1 
 \end{equation} 
 \indent if node $x_i$ and $x_j$ are in line-of-sight (as computed
 	from the map data) with each other, then $e_{ij}$ can be 1.\\
 The backbone-graph is a subgraph of the above graph and is denoted by node set
 $\{y_i\}$ and edge-set $\{b_{ij}\}$. From the subgraph property:
 \begin{equation}
-	%\forall i\mbox{ : } 
-	0 \leq y_{i} \leq x_{i}
+	\forall i \mbox{ } 0 \leq y_{i} \leq x_{i}
 \end{equation}
 \begin{equation}
 	%\forall i,j\mbox{ : } 
-	0 \leq b_{ij} \leq e_{ij}
+	\forall i,j \mbox{ } 0 \leq b_{ij} \leq e_{ij}
 \end{equation}
 To enforce symmetry:
 \begin{equation}
@@ -37,10 +36,10 @@ To enforce symmetry:
 \end{equation}
 To enforce edge-incidence:
 \begin{equation}
-	e_{ij} \leq \frac{1}{2}(x_i + x_j)
+	\forall i,j \mbox{ } e_{ij} \leq \frac{1}{2}(x_i + x_j)
 \end{equation}
 \begin{equation}
-	b_{ij} \leq \frac{1}{2}(y_i + y_j)
+	\forall i,j \mbox{ } b_{ij} \leq \frac{1}{2}(y_i + y_j)
 \end{equation}
 %Here, variables $x_i$, $y_i$, $e_{ij}$ and $b_{ij}$ have integer values 0 or 1. 
 %\\ 
@@ -78,35 +77,38 @@ each source node and an edge from each sink node to the supersink:
 	\forall i\mbox{ } 0 \leq b_{si} \leq y_i
 \end{equation}
 \begin{equation}
- 	\forall w \in W\mbox{ } 0 \leq e_{wt} = 1.
+ 	\forall w \in W\mbox{ } e_{wt} = 1
 \end{equation}
-{\color{red}
+{%color{red}
 There is a nonzero flow from $s$ to each source
 node:
 \begin{equation}
-	\forall y_i \in T \mbox{ : }f_{si} > 0
+	\forall i \mbox{ }f_{si} \geq \frac{y_{i}}{N} \mbox{, where N is a very large
+	number}
 \end{equation}
 }
-The total flow from $s$ must equal to that of to $t$:
-\begin{equation}
-	\forall i,j \mbox{ : } \sum_i f_{si} = \sum_j f_{jt}
-\end{equation} 
 All the flow must go through the backbone edges:
 \begin{equation}
 	\forall i,j \mbox{ : }f_{ij} \leq b_{ij}
 \end{equation}
+The total flow from $s$ must equal to that of to $t$:
+\begin{equation}
+	\sum_i f_{si} = \sum_j f_{jt}
+\end{equation} 
+
 Also the flows must be conserved:
 \begin{equation}
-	\forall i,j \neq s,t \mbox{ : } \sum_i f_{ij} = \sum_i f_{ji}
+	\forall j \mbox{ : } \sum_i f_{ij} = \sum_i f_{ji}
 \end{equation}
 \subsection*{Constraints:} a) The number of node in the network graph is bounded
 by a given parameter:
 \begin{equation}
-	\forall i \mbox{ }\sum_i x_i \leq n_{max}
+	\sum_i x_i \leq n_{max}
 \end{equation}
-b) The node degree of the backbone graph is also bounded by a given parameter:
+b) The node degree (except for the \textbf{sink nodes}) of the backbone graph is
+also bounded by a given parameter:
 \begin{equation}
-	\forall i \mbox{ } \sum_j b_{ij}  \leq d_{max}
+	\forall i \mid i \notin W \mbox{ } \sum_j b_{ij}  \leq d_{max}
 \end{equation}
 \subsection*{Objective}
 Maximize the total flow from the supersource to the supersink in the network
@@ -114,16 +116,16 @@ graph. Let the flow in link $e_{ij}$ be $g_{ij}$. The flow constraint equations
 can be formulated as follows:\\
 The total flow from $s$ must equal to that of to $t$:
 \begin{equation}
-	\forall i,j \mbox{ : } \sum_i g_{si} = \sum_j g_{jt}
+	\sum_i g_{si} = \sum_j g_{jt}
 \end{equation}
 Also the flows must be conserved:
 \begin{equation}
-	\forall i,j \neq s,t \mbox{ : } \sum_i g_{ij} = \sum_i g_{ji}
+	\forall j \mbox{  } \sum_i g_{ij} = \sum_i g_{ji}
 \end{equation}
-{\color{red}
+{%\color{red}
 The link capacity must not be exceeded:
 \begin{equation}
-	\forall i,j \mbox{ } g_{ij} \leq e_{ij} \mbox{ ?? }
+	\forall i,j \mbox{  } 0 \leq \mbox{ } g_{ij} \leq e_{ij}
 \end{equation}
 }
 The objective function is:
