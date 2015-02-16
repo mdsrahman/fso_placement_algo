@@ -2,7 +2,7 @@
 Given a dynamic graph D, "residual graph" G and super-source S and super-sink T.
 while (nodes available to add) {
          For every ORDERED pair of nodes i,j in G
-    Benefit(i,j) =   min(source-potential(i), sink-potential(j)) / newNodesPathLength(i,j)
+            Benefit(i,j) =   min(source-potential(i), sink-potential(j)) / newNodesPathLength(i,j)
          Pick the pair with highest benefit and add nodes on path(i,j) to D (dynamic graph).
          Also, add any links between nodes already added to D
          Find the residual graph G again. 
@@ -15,6 +15,7 @@ Sink-potential(j) -- This is maximum flow from i to T in G.
 '''
 import networkx as nx
 import random 
+from networkx.algorithms.flow import shortest_augmenting_path
   
 class Step_4:
   def __init__(self, seed = 101349):
@@ -108,7 +109,7 @@ class Step_4:
     
     for n in snk_list:
       g.edge[n]['snk']['capacity'] = float('inf')
-     
+  
 if __name__ == '__main__':
   print "starting run..."
   
@@ -133,12 +134,24 @@ if __name__ == '__main__':
   ets =  K.edges(K.nodes(),'capacity')
   for e in ets:
     print e
-  flow_value, flow_dict = nx.maximum_flow(K, 'src', 'snk')
+  #flow_value, flow_dict = nx.maximum_flow(K, 'src', 'snk')
+  R = shortest_augmenting_path(K,'src','snk')
+  flow_value = R.graph['flow_value']
+  print flow_value
+
+  for u in R.nodes():
+    for v in R.nodes():
+      if u not in ['src','snk',v] and v not in ['src','snk',u]:
+        print nx.shortest_path(s_4.g, u, v)
+  
+  print nx.shortest_path(s_4.g, 'src', v)   
+  '''
+  flow_dict = R.graph['flow_dict']
   print flow_value
   for i in flow_dict:
     for j in flow_dict[i]:
       print "(",i,",",j,"): ",flow_dict[i][j]
-
+  '''
   #s_4.print_graph(s_4.g1)
   
   
