@@ -12,11 +12,13 @@ iii) call the solver
 
 '''
 class ILP_Relaxed():
-  def __init__(self):
+  def __init__(self,nmax,dmax=3):
     print "ILP_Relaxed initialized...."
     self.adj = None
     self.T = None
     self.sinks =None
+    self.nmax = nmax
+    self.dmax = dmax
     
   def make_problem_instance(self,
                             num_node, 
@@ -24,7 +26,7 @@ class ILP_Relaxed():
                             short_edge_fraction, 
                             num_sink,
                             num_target,
-                            max_node_to_target_association
+                            max_node_to_target_association,
                             ):
     #-----first make a dense connected graph-----------
     while True:
@@ -173,23 +175,62 @@ class ILP_Relaxed():
     for i in self.adj.nodes():
       fso_placement_prob += e_wt[i] == 1, "eqn_12_("+str(i)+")"
     #***********end_of_task**************************************
+    
     #---task: make variables f_si and set equation (13) involving f_si, y_i, N ----
-    
+    N = sys.maxint * 1.0
+    f_s = pulp.LpVariable.dicts(name='f_s', 
+                              indexs = self.adj.nodes(), 
+                              #lowBound=0,  
+                              cat = pulp.LpContinuous)
+    print "DEBUG: f_si variables created"
+    for i,v in f_s.iteritems(): 
+      print "DEBUG: ",i,":",v
+    for i in self.adj.nodes():
+      fso_placement_prob += f_s[i] >= y[i] / N , "eqn_13_L_("+str(i)+")"
+      fso_placement_prob += f_s[i] <= y[i] * N , "eqn_13_U_("+str(i)+")"
     #***********end_of_task**************************************
-    #---task: make variables f_ij and set equation (14) involving f_ij and b_ij ----
     
+    #---task: make variables f_ij and set equation (14) involving f_ij and b_ij ----
+    f = pulp.LpVariable.dicts(name='f', 
+                              indexs = (self.adj.nodes(),self.adj.nodes()), 
+                              lowBound=0, 
+                              #upBound =1, 
+                              cat = pulp.LpContinuous)
+    print "DEBUG: f_ij variables created"
+    for i,v in f.iteritems(): 
+      print "DEBUG: ",i,":",v
+    for i in self.adj.nodes():
+      for j in self.adj.nodes():
+        fso_placement_prob += f[i][j] <= b[i][j],"eqn_14_("+str(i)+","+str(j)+")"
+        
     #***********end_of_task**************************************
     #---task: make variables f_jt and set equation (15) involving f_si and f_jt ----
-    
+    f_t = pulp.LpVariable.dicts(name='f_t', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0, 
+                              upBound = 1, #!!! is it really needed ?? 
+                              cat = pulp.LpContinuous)
+    print "DEBUG: f_jt variables created"
+    for i,v in f_t.iteritems(): 
+      print "DEBUG: ",i,":",v
+    fso_placement_prob += pulp.lpSum(f_s[i] for i in self.adj.nodes()) == \
+                          pulp.lpSum(f_t[j] for j in self.adj.nodes()), "eqn_15" 
     #***********end_of_task**************************************
     #---task: set equation (16) involving f_ij, f_si, f_jt ------
-    
+    for j in self.adj.nodes():
+      fso_placement_prob += pulp.lpSum(f[i][j] for i in self.adj.nodes())+ f_s[j] <= \
+                            pulp.lpSum(f[j][i] for i in self.adj.nodes())+ f_t[j], \
+                            "eqn_16_("+str(j)+")"
     #***********end_of_task**************************************
     #---task: set equation (17) involving x_i and n_max ----
-    
+    fso_placement_prob += pulp.lpSum(x[i] for i in self.adj.nodes()) <= self.nmax,\
+                          "eqn_17"
     #***********end_of_task**************************************
     #---task: set equation (18) involving set of sinks, b_ij, d_max ----
-    
+    for i in self.adj.nodes():
+      if i not in self.sinks:
+        fso_placement_prob += pulp.lpSum(b[i][j] for j in self.adj.nodes()) <= self.dmax,\
+        "eqn_18_("+str(i)+")"
     #***********end_of_task**************************************
     #---task: set variables g_si and g_jt and set equation (19) -----
     
@@ -215,7 +256,7 @@ class ILP_Relaxed():
    
    
 if __name__ == '__main__':
-  ilp = ILP_Relaxed()
+  ilp = ILP_Relaxed(nmax = 8, dmax = 3)
   ilp.make_problem_instance(num_node = 10, 
                             num_edge = 25, 
                             short_edge_fraction = 0.4, 
