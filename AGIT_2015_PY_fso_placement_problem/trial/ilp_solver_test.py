@@ -2,6 +2,7 @@ import pulp
 import networkx as nx
 import numpy as np
 import random
+import sys
 
 '''steps--------
 pre: build random nx grap instance- targets, adj graphs
@@ -82,6 +83,10 @@ class ILP_Relaxed():
     print "DEBUG: e_ij variables created"
     for i,e_item in e.iteritems():
       print "DEBUG: ",i,":",e_item
+    for i in self.adj.nodes():
+      for j in self.adj.nodes():
+        if not self.adj.has_edge(i, j):
+          fso_placement_prob += e[i][j] == 0, "eqn_1_non_edge_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
     
     #---task: make y_i variables and set equation (3)----
@@ -91,7 +96,7 @@ class ILP_Relaxed():
                               #upBound =1, 
                               cat = pulp.LpContinuous)
     print "DEBUG: y_i variables created"
-    for i,v in y.iteritems(): 
+    for i,v in y.iteritems():  
       print "DEBUG: ",i,":",v
       
     for i,v in y.iteritems():
@@ -118,26 +123,55 @@ class ILP_Relaxed():
         fso_placement_prob += e[i][j] == e[j][i], "eqn_5_("+str(i)+","+str(j)+")"
         fso_placement_prob += b[i][j] == b[j][i], "eqn_6_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
+    
     #---task: enforce edge-incidence by setting equation (7) and (8)----
     for i in self.adj.nodes():
       for j in self.adj.nodes():
         fso_placement_prob += e[i][j] <= 0.5 * (x[i] + x[j] ), "eqn_7_("+str(i)+","+str(j)+")"
         fso_placement_prob += b[i][j] <= 0.5 * (y[i] + y[j] ), "eqn_8_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
+    
     #---task: set equation (9) involving y_i and target array T_ij----
     num_targets, num_nodes = self.T.shape
     for t in range(num_targets):
       fso_placement_prob += pulp.lpSum( y[i] * self.T[t][i] for i in self.adj.nodes() ) >= 1,\
                            "eqn_9_("+str(t)+")"
     #***********end_of_task**************************************
+    
     #---task: make variables e_si and set equation (10) involving e_si and x_i ----
-    
+    e_s = pulp.LpVariable.dicts(name='e_s', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0,  
+                              cat = pulp.LpContinuous)
+    print "DEBUG: e_si variables created"
+    for i,v in e_s.iteritems(): 
+      print "DEBUG: ",i,":",v
+    for i in self.adj.nodes():
+      fso_placement_prob += e_s[i] <= x[i], "eqn_10_("+str(i)+")"
     #***********end_of_task**************************************
-    #---task: make variables b_si and set equation (11) involving b_si and y_i ---
     
+    #---task: make variables b_si and set equation (11) involving b_si and y_i ---
+    b_s = pulp.LpVariable.dicts(name='b_s', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0,  
+                              cat = pulp.LpContinuous)
+    print "DEBUG: b_si variables created"
+    for i,v in b_s.iteritems(): 
+      print "DEBUG: ",i,":",v
+    for i in self.adj.nodes():
+      fso_placement_prob += b_s[i] <= y[i], "eqn_11_("+str(i)+")"
+    #print sys.maxint
     #***********end_of_task**************************************
     #---task: make variables e_wt and set equation (12)----
-    
+    e_wt = pulp.LpVariable.dicts(name='e_wt', 
+                              indexs = self.adj.nodes(), 
+                              #lowBound=0,  
+                              cat = pulp.LpContinuous)
+    print "DEBUG: e_wt variables created"
+    for i,v in e_wt.iteritems(): 
+      print "DEBUG: ",i,":",v
+    for i in self.adj.nodes():
+      fso_placement_prob += e_wt[i] == 1, "eqn_12_("+str(i)+")"
     #***********end_of_task**************************************
     #---task: make variables f_si and set equation (13) involving f_si, y_i, N ----
     

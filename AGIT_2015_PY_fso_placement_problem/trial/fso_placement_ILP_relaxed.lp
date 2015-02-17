@@ -2,6 +2,86 @@
 Maximize
 OBJ: __dummy
 Subject To
+eqn_10_(0): e_s_0 - x_0 <= 0
+eqn_10_(1): e_s_1 - x_1 <= 0
+eqn_10_(2): e_s_2 - x_2 <= 0
+eqn_10_(3): e_s_3 - x_3 <= 0
+eqn_10_(4): e_s_4 - x_4 <= 0
+eqn_10_(5): e_s_5 - x_5 <= 0
+eqn_10_(6): e_s_6 - x_6 <= 0
+eqn_10_(7): e_s_7 - x_7 <= 0
+eqn_10_(8): e_s_8 - x_8 <= 0
+eqn_10_(9): e_s_9 - x_9 <= 0
+eqn_11_(0): b_s_0 - y_0 <= 0
+eqn_11_(1): b_s_1 - y_1 <= 0
+eqn_11_(2): b_s_2 - y_2 <= 0
+eqn_11_(3): b_s_3 - y_3 <= 0
+eqn_11_(4): b_s_4 - y_4 <= 0
+eqn_11_(5): b_s_5 - y_5 <= 0
+eqn_11_(6): b_s_6 - y_6 <= 0
+eqn_11_(7): b_s_7 - y_7 <= 0
+eqn_11_(8): b_s_8 - y_8 <= 0
+eqn_11_(9): b_s_9 - y_9 <= 0
+eqn_12_(0): e_wt_0 = 1
+eqn_12_(1): e_wt_1 = 1
+eqn_12_(2): e_wt_2 = 1
+eqn_12_(3): e_wt_3 = 1
+eqn_12_(4): e_wt_4 = 1
+eqn_12_(5): e_wt_5 = 1
+eqn_12_(6): e_wt_6 = 1
+eqn_12_(7): e_wt_7 = 1
+eqn_12_(8): e_wt_8 = 1
+eqn_12_(9): e_wt_9 = 1
+eqn_1_non_edge_(0,0): e_0_0 = 0
+eqn_1_non_edge_(0,2): e_0_2 = 0
+eqn_1_non_edge_(0,4): e_0_4 = 0
+eqn_1_non_edge_(0,7): e_0_7 = 0
+eqn_1_non_edge_(0,8): e_0_8 = 0
+eqn_1_non_edge_(0,9): e_0_9 = 0
+eqn_1_non_edge_(1,1): e_1_1 = 0
+eqn_1_non_edge_(1,3): e_1_3 = 0
+eqn_1_non_edge_(1,6): e_1_6 = 0
+eqn_1_non_edge_(1,9): e_1_9 = 0
+eqn_1_non_edge_(2,0): e_2_0 = 0
+eqn_1_non_edge_(2,2): e_2_2 = 0
+eqn_1_non_edge_(2,3): e_2_3 = 0
+eqn_1_non_edge_(3,1): e_3_1 = 0
+eqn_1_non_edge_(3,2): e_3_2 = 0
+eqn_1_non_edge_(3,3): e_3_3 = 0
+eqn_1_non_edge_(3,4): e_3_4 = 0
+eqn_1_non_edge_(3,8): e_3_8 = 0
+eqn_1_non_edge_(3,9): e_3_9 = 0
+eqn_1_non_edge_(4,0): e_4_0 = 0
+eqn_1_non_edge_(4,3): e_4_3 = 0
+eqn_1_non_edge_(4,4): e_4_4 = 0
+eqn_1_non_edge_(4,6): e_4_6 = 0
+eqn_1_non_edge_(5,5): e_5_5 = 0
+eqn_1_non_edge_(5,6): e_5_6 = 0
+eqn_1_non_edge_(5,7): e_5_7 = 0
+eqn_1_non_edge_(5,8): e_5_8 = 0
+eqn_1_non_edge_(5,9): e_5_9 = 0
+eqn_1_non_edge_(6,1): e_6_1 = 0
+eqn_1_non_edge_(6,4): e_6_4 = 0
+eqn_1_non_edge_(6,5): e_6_5 = 0
+eqn_1_non_edge_(6,6): e_6_6 = 0
+eqn_1_non_edge_(6,8): e_6_8 = 0
+eqn_1_non_edge_(6,9): e_6_9 = 0
+eqn_1_non_edge_(7,0): e_7_0 = 0
+eqn_1_non_edge_(7,5): e_7_5 = 0
+eqn_1_non_edge_(7,7): e_7_7 = 0
+eqn_1_non_edge_(7,9): e_7_9 = 0
+eqn_1_non_edge_(8,0): e_8_0 = 0
+eqn_1_non_edge_(8,3): e_8_3 = 0
+eqn_1_non_edge_(8,5): e_8_5 = 0
+eqn_1_non_edge_(8,6): e_8_6 = 0
+eqn_1_non_edge_(8,8): e_8_8 = 0
+eqn_1_non_edge_(9,0): e_9_0 = 0
+eqn_1_non_edge_(9,1): e_9_1 = 0
+eqn_1_non_edge_(9,3): e_9_3 = 0
+eqn_1_non_edge_(9,5): e_9_5 = 0
+eqn_1_non_edge_(9,6): e_9_6 = 0
+eqn_1_non_edge_(9,7): e_9_7 = 0
+eqn_1_non_edge_(9,9): e_9_9 = 0
 eqn_3_(0): - x_0 + y_0 <= 0
 eqn_3_(1): - x_1 + y_1 <= 0
 eqn_3_(2): - x_2 + y_2 <= 0
@@ -512,19 +592,19 @@ eqn_8_(9,6): b_9_6 - 0.5 y_6 - 0.5 y_9 <= 0
 eqn_8_(9,7): b_9_7 - 0.5 y_7 - 0.5 y_9 <= 0
 eqn_8_(9,8): b_9_8 - 0.5 y_8 - 0.5 y_9 <= 0
 eqn_8_(9,9): b_9_9 - y_9 <= 0
-eqn_9_(0): y_2 + y_5 + y_7 >= 1
-eqn_9_(1): y_2 + y_5 >= 1
-eqn_9_(10): y_4 + y_6 >= 1
-eqn_9_(11): y_1 + y_2 >= 1
-eqn_9_(12): y_6 >= 1
-eqn_9_(2): y_6 >= 1
-eqn_9_(3): y_9 >= 1
-eqn_9_(4): y_6 >= 1
-eqn_9_(5): y_0 >= 1
-eqn_9_(6): y_1 + y_5 + y_7 >= 1
-eqn_9_(7): y_1 + y_6 + y_9 >= 1
-eqn_9_(8): y_8 >= 1
-eqn_9_(9): y_1 + y_5 >= 1
+eqn_9_(0): y_5 >= 1
+eqn_9_(1): y_2 + y_8 >= 1
+eqn_9_(10): y_0 + y_2 >= 1
+eqn_9_(11): y_5 >= 1
+eqn_9_(12): y_4 + y_7 >= 1
+eqn_9_(2): y_6 + y_7 >= 1
+eqn_9_(3): y_5 + y_9 >= 1
+eqn_9_(4): y_7 >= 1
+eqn_9_(5): y_2 + y_3 + y_7 >= 1
+eqn_9_(6): y_4 + y_7 >= 1
+eqn_9_(7): y_1 + y_4 >= 1
+eqn_9_(8): y_6 >= 1
+eqn_9_(9): y_6 + y_8 >= 1
 Bounds
 __dummy = 0
 b_0_0 <= 1
@@ -727,6 +807,16 @@ e_9_6 <= 1
 e_9_7 <= 1
 e_9_8 <= 1
 e_9_9 <= 1
+e_wt_0 free
+e_wt_1 free
+e_wt_2 free
+e_wt_3 free
+e_wt_4 free
+e_wt_5 free
+e_wt_6 free
+e_wt_7 free
+e_wt_8 free
+e_wt_9 free
 x_0 <= 1
 x_1 <= 1
 x_2 <= 1
