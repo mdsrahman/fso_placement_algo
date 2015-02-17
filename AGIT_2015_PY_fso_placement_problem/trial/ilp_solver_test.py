@@ -58,51 +58,101 @@ class ILP_Relaxed():
   
   def build_lp_instance(self):
     #first make the problem instance
-    fso_problem = pulp.LpProblem(name = "FSO_PLACEMENT_PROBLEM", sense = pulp.LpMaximize)
+    fso_placement_prob = pulp.LpProblem(name = "FSO_PLACEMENT_PROBLEM", sense = pulp.LpMaximize)
+    fso_placement_prob += 0, "Arbitrary Objective Function" #<_--!!!!!comeback with equation (24)-----!!!!
+    
+    
     #----task: make x_i variables and set equation (1)-----
-    x_index =  [i for i in range(self.adj.number_of_nodes())]
+    x = pulp.LpVariable.dicts(name='x', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0, 
+                              upBound =1, 
+                              cat = pulp.LpContinuous)
+    print "DEBUG: x_i variables created"
+    for i,v in x.iteritems(): 
+      print "DEBUG: ",i,":",v
+    #***********end_of_task**************************************
+    
     #----task: make e_ij variables and set equation (2)----
+    e = pulp.LpVariable.dicts(name='e', 
+                              indexs = (self.adj.nodes(),self.adj.nodes()), 
+                              lowBound=0, 
+                              upBound =1, 
+                              cat = pulp.LpContinuous)
+    print "DEBUG: e_ij variables created"
+    for i,e_item in e.iteritems():
+      print "DEBUG: ",i,":",e_item
+    #***********end_of_task**************************************
     
     #---task: make y_i variables and set equation (3)----
+    y = pulp.LpVariable.dicts(name='y', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0, 
+                              #upBound =1, 
+                              cat = pulp.LpContinuous)
+    print "DEBUG: y_i variables created"
+    for i,v in y.iteritems(): 
+      print "DEBUG: ",i,":",v
+    
+    #***********end_of_task**************************************
     
     #---task: make b_ij variables and set equation (4)----
     
+    #***********end_of_task**************************************
     #---task: enforce symmetry by setting equation (5) and (6)-----
     
+    #***********end_of_task**************************************
     #---task: enforce edge-incidence by setting equation (7) and (8)----
     
+    #***********end_of_task**************************************
     #---task: set equation (9) involving y_i and target array T_ij----
     
+    #***********end_of_task**************************************
     #---task: make variables e_si and set equation (10) involving e_si and x_i ----
-     
+    
+    #***********end_of_task**************************************
     #---task: make variables b_si and set equation (11) involving b_si and y_i ---
     
+    #***********end_of_task**************************************
     #---task: make variables e_wt and set equation (12)----
     
+    #***********end_of_task**************************************
     #---task: make variables f_si and set equation (13) involving f_si, y_i, N ----
     
+    #***********end_of_task**************************************
     #---task: make variables f_ij and set equation (14) involving f_ij and b_ij ----
     
+    #***********end_of_task**************************************
     #---task: make variables f_jt and set equation (15) involving f_si and f_jt ----
     
+    #***********end_of_task**************************************
     #---task: set equation (16) involving f_ij, f_si, f_jt ------
     
+    #***********end_of_task**************************************
     #---task: set equation (17) involving x_i and n_max ----
     
+    #***********end_of_task**************************************
     #---task: set equation (18) involving set of sinks, b_ij, d_max ----
     
+    #***********end_of_task**************************************
     #---task: set variables g_si and g_jt and set equation (19) -----
     
+    #***********end_of_task**************************************
     #---task: set variables g_ij and set equation (20) involving g_ij, g_si, g_jt ----
     
+    #***********end_of_task**************************************
     #---task: set equation (21) involving g_ij and e_ij ----
     
+    #***********end_of_task**************************************
     #---task: set equation (22) involving N, f_si and x_i ----
     
+    #***********end_of_task**************************************
     #---task: set equation (23) involving N, f_it and x_i ----
     
+    #***********end_of_task**************************************
     #---task: set objective equation (24) involving g_si
     
+    #***********end_of_task**************************************
     return
 
    
@@ -116,6 +166,7 @@ if __name__ == '__main__':
                             num_target = 13,
                             max_node_to_target_association = 3
                             )
+  ilp.build_lp_instance()
   '''
   prob = LpProblem("FSO Placement Problem", LpMinimize)
   xval = [i for i in range(total_nodes)]
