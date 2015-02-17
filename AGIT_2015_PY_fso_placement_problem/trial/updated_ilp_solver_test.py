@@ -28,9 +28,9 @@ class ILP_Relaxed():
                             num_target,
                             max_node_to_target_association,
                             ):
-    
+    self.T =  np.zeros(shape = (num_target, num_node), dtype = int)
     #-----first make a dense connected graph-----------
-    while True:
+    while True: 
       self.adj = nx.dense_gnm_random_graph(num_node,num_edge)
       if nx.is_connected(self.adj):
         break
@@ -43,22 +43,22 @@ class ILP_Relaxed():
     short_edges = random.sample(self.adj.edges(), total_short_edges )
     for u,v in short_edges:
       self.adj[u][v]['con_type'] = 'short'
-    
+    '''
     for edge in self.adj.edges(data = True):
       print edge
-
+    '''
     #------now randomly choose sinks-----------------------
     self.sinks = random.sample(self.adj.nodes(), num_sink)
-
-    #--------now randomly hooks targets to source nodes-------
+        #-------- randomly hooks targets to source nodes-------
     #T is the matrix of size num_tarets x num_nodes
-    self.T =  np.zeros(shape = (num_target, self.adj.number_of_nodes()), dtype = int)
+    #self.T =  np.zeros(shape = (num_target, num_node), dtype = bool)
     for t in range(num_target):
       num_of_assoc_sources = random.randint(1,max_node_to_target_association)
       assoc_sources = random.sample(self.adj.nodes(),num_of_assoc_sources)
       for n in assoc_sources:
         self.T[t][n] = 1
-    print self.T
+    #print self.T
+
   
   def build_lp_instance(self):
     #first make the problem instance
@@ -69,11 +69,11 @@ class ILP_Relaxed():
                               indexs = self.adj.nodes(), 
                               lowBound=0,  
                               cat = pulp.LpContinuous)
-    
+    '''
     print "DEBUG: objective func. variable g_si created"
     for i,v in g_s.iteritems(): 
       print "DEBUG: ",i,":",v
-      
+    '''  
     fso_placement_prob += pulp.lpSum(g_s[i] for i in self.adj.nodes()), "objective_func_eqn_29" #<---objective func...
     
     #----task: make x_i variables and set equation (1) [default in var def] ---------
@@ -82,9 +82,11 @@ class ILP_Relaxed():
                               lowBound=0, 
                               upBound =1, 
                               cat = pulp.LpContinuous)
+    '''
     print "DEBUG: x_i variables created"
     for i,v in x.iteritems(): 
       print "DEBUG: ",i,":",v
+    '''
     #***********end_of_task**************************************
     
     #----task: make e_ij variables set equation (2) [default in var def] ---------
@@ -93,11 +95,11 @@ class ILP_Relaxed():
                               lowBound=0, 
                               upBound =1, 
                               cat = pulp.LpContinuous)
-    
+    '''
     print "DEBUG: e_ij variables created"
     for i,e_item in e.iteritems():
       print "DEBUG: ",i,":",e_item
-      
+    ''' 
     #***********end_of_task**************************************
     
     #----task: for all non-LOS edges, set equation (3)  ---------
@@ -113,10 +115,11 @@ class ILP_Relaxed():
                               lowBound=0, 
                               #upBound =1, 
                               cat = pulp.LpContinuous)
+    '''
     print "DEBUG: y_i variables created"
     for i,v in y.iteritems():  
       print "DEBUG: ",i,":",v
-      
+    '''  
     for i,v in y.iteritems():
       fso_placement_prob += y[i] <= x[i], "eqn_4_("+str(i)+")"
     #***********end_of_task**************************************
@@ -127,10 +130,11 @@ class ILP_Relaxed():
                               lowBound=0, 
                               upBound =1, 
                               cat = pulp.LpContinuous)
+    '''
     print "DEBUG: b_ij variables created"
     for i,v in b.iteritems():
       print "DEBUG: ",i,":",v
-      
+    '''  
     for i in self.adj.nodes():
       for j in self.adj.nodes():
         fso_placement_prob += b[i][j] <= e[i][j], "eqn_5_("+str(i)+","+str(j)+")"
@@ -169,10 +173,11 @@ class ILP_Relaxed():
                               lowBound=0, 
                               #upBound =1, 
                               cat = pulp.LpContinuous)
+    '''
     print "DEBUG: f_ij variables created"
     for i,v in f.iteritems(): 
       print "DEBUG: ",i,":",v
-      
+    ''' 
     for i in self.adj.nodes():
       for j in self.adj.nodes():
         fso_placement_prob += f[i][j] <= b[i][j],"eqn_13_("+str(i)+","+str(j)+")"
@@ -183,11 +188,12 @@ class ILP_Relaxed():
                               indexs = self.adj.nodes(), 
                               lowBound=0,  #should it be so ??!!
                               cat = pulp.LpContinuous)
+    '''
     print "DEBUG: f_si variables created"
     
     for i,v in f_s.iteritems(): 
       print "DEBUG: ",i,":",v
-      
+    ''' 
     for i in self.adj.nodes():
       if i not in self.sinks:
         fso_placement_prob += f_s[i] >= y[i] / N , "eqn_14_L_("+str(i)+")"
@@ -207,11 +213,11 @@ class ILP_Relaxed():
                               lowBound=0, 
                               #upBound = 1, #!!! is it really needed ?? 
                               cat = pulp.LpContinuous)
-    
+    '''
     print "DEBUG: f_jt variables created"
     for i,v in f_t.iteritems(): 
       print "DEBUG: ",i,":",v
-    
+    '''
     for i in self.sinks: 
       fso_placement_prob += f_t[i] <= N, "eqn_16_("+str(i)+")" 
     #***********end_of_task**************************************
@@ -253,10 +259,11 @@ class ILP_Relaxed():
                               lowBound=0, 
                               #upBound =1, 
                               cat = pulp.LpContinuous)
+    '''
     print "DEBUG: g_ij variables created"
     for i,v in g.iteritems(): 
       print "DEBUG: ",i,":",v
-      
+    '''  
     for i in self.adj.nodes():
       for j in self.adj.nodes():
         fso_placement_prob += g[i][j] <= e[i][j],"eqn_22_("+str(i)+","+str(j)+")"
@@ -277,10 +284,11 @@ class ILP_Relaxed():
                               indexs = self.adj.nodes(), 
                               lowBound=0,  
                               cat = pulp.LpContinuous)
+    '''
     print "DEBUG: g_jt variables created"
     for i,v in g_t.iteritems(): 
       print "DEBUG: ",i,":",v 
-      
+    '''  
     for i in self.sinks:
       fso_placement_prob += g_t[i] <= N, "eqn_25_("+str(i)+")" 
     
@@ -317,13 +325,13 @@ class ILP_Relaxed():
    
    
 if __name__ == '__main__':
-  ilp = ILP_Relaxed(nmax = 100, dmax = 3)
-  ilp.make_problem_instance(num_node = 200, 
-                            num_edge = 800, 
+  ilp = ILP_Relaxed(nmax = 20, dmax = 3)
+  ilp.make_problem_instance(num_node = 50, 
+                            num_edge = 100, 
                             short_edge_fraction = 0.3, 
-                            num_sink = 20,
-                            num_target = 150,
-                            max_node_to_target_association = 5
+                            num_sink = 10,
+                            num_target = 20,
+                            max_node_to_target_association = 4
                             )
   ilp.build_lp_instance()
   '''
