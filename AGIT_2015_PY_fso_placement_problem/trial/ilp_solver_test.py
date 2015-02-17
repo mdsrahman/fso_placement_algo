@@ -62,7 +62,15 @@ class ILP_Relaxed():
   def build_lp_instance(self):
     #first make the problem instance
     fso_placement_prob = pulp.LpProblem(name = "FSO_PLACEMENT_PROBLEM", sense = pulp.LpMaximize)
-    fso_placement_prob += 0, "Arbitrary Objective Function" #<_--!!!!!comeback with equation (24)-----!!!!
+    #obj func. g_s must be defined first as required by the PuLP....
+    g_s = pulp.LpVariable.dicts(name='g_s', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0,  
+                              cat = pulp.LpContinuous)
+    print "DEBUG: objective func. variable g_si created"
+    for i,v in g_s.iteritems(): 
+      print "DEBUG: ",i,":",v
+    fso_placement_prob += pulp.lpSum(g_s[i] for i in self.adj.nodes()), "objective_func_eqn_24" #<---objective func...
     
     
     #----task: make x_i variables and set equation (1)-----
@@ -233,24 +241,63 @@ class ILP_Relaxed():
         "eqn_18_("+str(i)+")"
     #***********end_of_task**************************************
     #---task: set variables g_si and g_jt and set equation (19) -----
-    
+    #g_s is declared at the top, due to the requirement that obj must appear first in PuLP
+    '''
+    g_s = pulp.LpVariable.dicts(name='g_s', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0,  
+                              cat = pulp.LpContinuous)
+    print "DEBUG: g_si variables created"
+    for i,v in g_s.iteritems(): 
+      print "DEBUG: ",i,":",v
+    '''
+    g_t = pulp.LpVariable.dicts(name='g_t', 
+                              indexs = self.adj.nodes(), 
+                              lowBound=0,  
+                              cat = pulp.LpContinuous)
+    print "DEBUG: g_jt variables created"
+    for i,v in g_t.iteritems(): 
+      print "DEBUG: ",i,":",v   
+    fso_placement_prob += pulp.lpSum(g_s[i] for i in self.adj.nodes()) == \
+                          pulp.lpSum(g_t[j] for j in self.adj.nodes()), "eqn_19"
+      
     #***********end_of_task**************************************
+    
     #---task: set variables g_ij and set equation (20) involving g_ij, g_si, g_jt ----
-    
+    g = pulp.LpVariable.dicts(name='g', 
+                              indexs = (self.adj.nodes(),self.adj.nodes()), 
+                              lowBound=0, 
+                              #upBound =1, 
+                              cat = pulp.LpContinuous)
+    print "DEBUG: g_ij variables created"
+    for i,v in g.iteritems(): 
+      print "DEBUG: ",i,":",v
+      
+    for j in self.adj.nodes(): 
+      fso_placement_prob += pulp.lpSum(g[i][j] for i in self.adj.nodes())+ g_s[j] <= \
+                            pulp.lpSum(g[j][i] for i in self.adj.nodes())+ g_t[j], \
+                            "eqn_20_("+str(j)+")"
     #***********end_of_task**************************************
-    #---task: set equation (21) involving g_ij and e_ij ----
     
+    #---task: set equation (21) involving g_ij and e_ij ----
+    for i in self.adj.nodes():
+      for j in self.adj.nodes():
+        fso_placement_prob += g[i][j] <= e[i][j],"eqn_21_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
     #---task: set equation (22) involving N, f_si and x_i ----
-    
+    for i in self.adj.nodes():
+      fso_placement_prob += f_s[i] <= N*x[i],"eqn_22_("+str(i)+")"
     #***********end_of_task**************************************
     #---task: set equation (23) involving N, f_it and x_i ----
-    
+    for i in self.adj.nodes():
+      fso_placement_prob += f_t[i] <= N*x[i],"eqn_23_("+str(i)+")"
     #***********end_of_task**************************************
     #---task: set objective equation (24) involving g_si
-    
+    #done in the first step ----due to the structure of PuLP, where obj must appear first
     #***********end_of_task**************************************
     fso_placement_prob.writeLP("fso_placement_ILP_relaxed.lp")
+    #fso_placement_prob.solve(pulp.CPLEX()) 
+    fso_placement_prob.solve() 
     return
 
    
