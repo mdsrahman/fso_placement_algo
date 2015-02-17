@@ -57,6 +57,51 @@ class ILP_Relaxed():
     print self.T
   
   def build_lp_instance(self):
+    #first make the problem instance
+    fso_problem = pulp.LpProblem(name = "FSO_PLACEMENT_PROBLEM", sense = pulp.LpMaximize)
+    #----task: make x_i variables and set equation (1)-----
+    x_index =  [i for i in range(self.adj.number_of_nodes())]
+    #----task: make e_ij variables and set equation (2)----
+    
+    #---task: make y_i variables and set equation (3)----
+    
+    #---task: make b_ij variables and set equation (4)----
+    
+    #---task: enforce symmetry by setting equation (5) and (6)-----
+    
+    #---task: enforce edge-incidence by setting equation (7) and (8)----
+    
+    #---task: set equation (9) involving y_i and target array T_ij----
+    
+    #---task: make variables e_si and set equation (10) involving e_si and x_i ----
+     
+    #---task: make variables b_si and set equation (11) involving b_si and y_i ---
+    
+    #---task: make variables e_wt and set equation (12)----
+    
+    #---task: make variables f_si and set equation (13) involving f_si, y_i, N ----
+    
+    #---task: make variables f_ij and set equation (14) involving f_ij and b_ij ----
+    
+    #---task: make variables f_jt and set equation (15) involving f_si and f_jt ----
+    
+    #---task: set equation (16) involving f_ij, f_si, f_jt ------
+    
+    #---task: set equation (17) involving x_i and n_max ----
+    
+    #---task: set equation (18) involving set of sinks, b_ij, d_max ----
+    
+    #---task: set variables g_si and g_jt and set equation (19) -----
+    
+    #---task: set variables g_ij and set equation (20) involving g_ij, g_si, g_jt ----
+    
+    #---task: set equation (21) involving g_ij and e_ij ----
+    
+    #---task: set equation (22) involving N, f_si and x_i ----
+    
+    #---task: set equation (23) involving N, f_it and x_i ----
+    
+    #---task: set objective equation (24) involving g_si
     
     return
 
