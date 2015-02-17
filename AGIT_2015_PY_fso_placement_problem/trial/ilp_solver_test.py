@@ -93,20 +93,42 @@ class ILP_Relaxed():
     print "DEBUG: y_i variables created"
     for i,v in y.iteritems(): 
       print "DEBUG: ",i,":",v
-    
+      
+    for i,v in y.iteritems():
+      fso_placement_prob += y[i] <= x[i], "eqn_3_("+str(i)+")"
     #***********end_of_task**************************************
     
     #---task: make b_ij variables and set equation (4)----
-    
+    b = pulp.LpVariable.dicts(name='b', 
+                              indexs = (self.adj.nodes(),self.adj.nodes()), 
+                              lowBound=0, 
+                              upBound =1, 
+                              cat = pulp.LpContinuous)
+    print "DEBUG: b_ij variables created"
+    for i,b_item in b.iteritems():
+      print "DEBUG: ",i,":",b_item
+    for i in self.adj.nodes():
+      for j in self.adj.nodes():
+        fso_placement_prob += b[i][j] <= e[i][j], "eqn_4_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
-    #---task: enforce symmetry by setting equation (5) and (6)-----
     
+    #---task: enforce symmetry by setting equation (5) and (6)-----
+    for i in self.adj.nodes():
+      for j in self.adj.nodes():
+        fso_placement_prob += e[i][j] == e[j][i], "eqn_5_("+str(i)+","+str(j)+")"
+        fso_placement_prob += b[i][j] == b[j][i], "eqn_6_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
     #---task: enforce edge-incidence by setting equation (7) and (8)----
-    
+    for i in self.adj.nodes():
+      for j in self.adj.nodes():
+        fso_placement_prob += e[i][j] <= 0.5 * (x[i] + x[j] ), "eqn_7_("+str(i)+","+str(j)+")"
+        fso_placement_prob += b[i][j] <= 0.5 * (y[i] + y[j] ), "eqn_8_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
     #---task: set equation (9) involving y_i and target array T_ij----
-    
+    num_targets, num_nodes = self.T.shape
+    for t in range(num_targets):
+      fso_placement_prob += pulp.lpSum( y[i] * self.T[t][i] for i in self.adj.nodes() ) >= 1,\
+                           "eqn_9_("+str(t)+")"
     #***********end_of_task**************************************
     #---task: make variables e_si and set equation (10) involving e_si and x_i ----
     
@@ -153,6 +175,7 @@ class ILP_Relaxed():
     #---task: set objective equation (24) involving g_si
     
     #***********end_of_task**************************************
+    fso_placement_prob.writeLP("fso_placement_ILP_relaxed.lp")
     return
 
    
