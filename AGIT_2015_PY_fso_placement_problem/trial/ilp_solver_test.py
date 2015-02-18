@@ -295,20 +295,20 @@ class ILP_Relaxed():
     #---task: set objective equation (24) involving g_si
     #done in the first step ----due to the structure of PuLP, where obj must appear first
     #***********end_of_task**************************************
-    fso_placement_prob.writeLP("fso_placement_ILP_relaxed.lp")
-    #fso_placement_prob.solve(pulp.CPLEX()) 
-    fso_placement_prob.solve() 
+    fso_placement_prob.writeLP("fso_placement_ILP_relaxed_"+str(self.adj.number_of_nodes())+"_.lp")
+    fso_placement_prob.solve(pulp.CPLEX()) 
+    #fso_placement_prob.solve() 
     return
 
    
    
 if __name__ == '__main__':
-  ilp = ILP_Relaxed(nmax = 8, dmax = 3)
+  ilp = ILP_Relaxed(nmax = 200, dmax = 8)
   ilp.make_problem_instance(num_node = 10, 
-                            num_edge = 25, 
-                            short_edge_fraction = 0.4, 
-                            num_sink = 2,
-                            num_target = 13,
+                            num_edge = 30, 
+                            short_edge_fraction = 1.0, 
+                            num_sink = 6,
+                            num_target = 4,
                             max_node_to_target_association = 3
                             )
   ilp.build_lp_instance()
