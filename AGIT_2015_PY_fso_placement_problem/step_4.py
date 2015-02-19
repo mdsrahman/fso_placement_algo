@@ -3,9 +3,10 @@ import random
 import networkx.algorithms.flow as flow
   
 class Step_4:
-  def __init__(self, seed = 101349):
+  def __init__(self, capacity = 1.0, seed = 101349):
     print "Initializing Step_4....."
     random.seed(seed)  
+    self.capacity = capacity
     self.g1 = None # the backbone graph g=(y_i, b_ij)
     self.g =  None # the full graph g1=(x_i, e_ij)
     
@@ -81,25 +82,26 @@ class Step_4:
     if src_list == None: src_list=self.sources
     if snk_list == None: snk_list=self.sinks
     
-    self.g1.add_node('src')
+    g.add_node('src')
     for i in self.sources:
-      self.g1.add_edge('src',i)
+      g.add_edge('src',i)
     
-    self.g1.add_node('snk')
+    g.add_node('snk')
     for i in self.sinks:
-      self.g1.add_edge(i,'snk')
+      g.add_edge(i,'snk')
       
     edge_set =  g.edges()
     for x,y in edge_set:
       g.edge[x][y]['capacity'] = capacity
       
     #now override the supersrc-->src capacities and sink-->supersink capacities
+    self.print_graph(g)
     for n in src_list:
       g.edge['src'][n]['capacity'] = float('inf')
     
     for n in snk_list:
       g.edge[n]['snk']['capacity'] = float('inf')
-      
+    return g
   def compute_residual_graph(self,g, capacity='capacity', flow='flow'):
     for i,j in g.edges():
       g[i][j]['capacity'] -= g[i][j]['flow']
@@ -124,19 +126,28 @@ class Step_4:
     Sink-potential(j) -- This is maximum flow from i to T in G.
     '''#<--
     #find set of nodes still available to add to dynamic graph g1 to from input graph g
-    available_nodes = list(set(self.g.nodes()) - set(self.g1.nodes()))
-    #print available_nodes
     backbone_nodes = self.g1.nodes()
+    print "DEBUG:backbone_nodes:",backbone_nodes
+    available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
+    print available_nodes
+    
     
     while(available_nodes):
+      d = nx.Graph(self.g1)
+      print "DEBUG:type(d):",type(d)
+      d = self.add_capacity(g = d, capacity = self.capacity)
+      print "DEBUG:type(d):",type(d)
+      print d.has_node('src')
       max_benefit = - float('inf')
       max_i = max_j = -1
       new_node_list = None
+      
       for i in backbone_nodes:
         for j in backbone_nodes:
+          print "DEBUG:(i,j):",i,j
           if i !=j:
             #step i) run max-flow and get the dynamic graph g1 and compute the residual graph
-            r = flow.shortest_augmenting_path(G=s_4.g1, s='src', t='snk', capacity = 'capacity')
+            r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
             r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
             #step ii) find source-potential for i on r
             r1 = flow.shortest_augmenting_path(G=r, s='src',t=i, capacity = 'capacity')
@@ -145,17 +156,39 @@ class Step_4:
             r1 = flow.shortest_augmenting_path(G=r, s=j,t='snk', capacity = 'capacity')
             j_potential = r1.graph['flow_value']
             #step iv) find shortest path from i to j on g
-            i_j_path = nx.shortest_path(self.g, i, j)
+            all_shortest_paths_i_j = nx.all_shortest_paths(G=self.g,source=i,target=j)
             
+            minimum_node_from_availabe_set = 0
+            min_path = []
+            for p in all_shortest_paths_i_j:
+              print "DEBUG:p:",p
+              #print "DEBUG:available_set:",available_nodes
+              available_node_count = len(p) - len(set(p) - set(available_nodes))
+              if available_node_count > minimum_node_from_availabe_set:
+                minimum_node_from_availabe_set = available_node_count
+                min_path = p
+              #find the minimum number of external-node shortest paths
+              
+            #i_j_path = nx.shortest_path(self.g, i, j)
+            
+            i_j_path = min_path
+            print "DEBUG: i_j_path: ",i_j_path
             if len(i_j_path)<=2: 
               continue
-            new_nodes_on_i_j_path =  set(self.g1.nodes()) - set(i_j_path)
+            new_nodes_on_i_j_path = []
+            for n in i_j_path:
+              if n in available_nodes:
+                new_nodes_on_i_j_path.append(n)
+            
             new_node_count = len(new_nodes_on_i_j_path )
             if  new_node_count < 1:
               continue
             
             #step v) calculate benefit, if the benefit>max, save i,j,benefit,path(i->j)
             i_j_path_benefit = min(i_potential, j_potential)/(1.0 * new_node_count)
+            print "DEBUG:new_nodes_i_j_path:",new_nodes_on_i_j_path
+            print "DEBUG:i_potential:",i_potential
+            print "DEBUG:j_potential:",j_potential
             print "DEBUG: (i,j,path_benefit):",i,",",j,",",i_j_path_benefit
             if i_j_path_benefit > max_benefit:
               max_benefit = i_j_path_benefit
@@ -163,17 +196,27 @@ class Step_4:
               max_j = j
               new_node_list = new_nodes_on_i_j_path
             #t= raw_input("press enter:")
-      #step vi) update graph g1 with new nodes,edges from i,j
+      #step vi) update graph g1 with new nodes,edges from i,j 
+      #and remove the nodes from list available_nodes
       if max_i ==-1:
         break #no i,j found
       #otherwise add the paths:
-      
+      print "DEBUG: new_nodes_added:",new_node_list
+      print "DEBUG: available_nodes:",available_nodes
+      for n in new_node_list:
+        self.g1.add_node(n)
+        available_nodes.remove(n)
+
+      for n in new_node_list: 
+        for nbr in self.g[n]:
+          if nbr in self.g1.nodes():
+            self.g1.add_edge(n,nbr)
     return
   
 if __name__ == '__main__':
   print "starting run..."
   
-  s_4 = Step_4()
+  s_4 = Step_4( capacity = 1.0)
   
   num_nodes_in_flow_graph = 10
   num_edges_in_flow_graph = 25
@@ -188,58 +231,9 @@ if __name__ == '__main__':
                             input_graph_node_time)
   
   capacity = 1.0
-  s_4.add_capacity(g = s_4.g1, capacity = capacity)
-  #s_4.run_step_4()
-  #'''
-  #now run the max_flow
-  #K= s_4.g1.to_directed()
-  #ets =  K.edges(K.nodes(),data=True)
-  
-  #for e in ets:
-    #print e
-  
-  #flow_value, flow_dict = nx.maximum_flow(K, 'src', 'snk')
-  r = flow.shortest_augmenting_path(G=s_4.g1, s='src', t='snk', capacity = 'capacity')
-  flow_value = r.graph['flow_value']
-  print flow_value
+  #s_4.add_capacity(g = s_4.g1, capacity = capacity)
+  s_4.run_step_4()
 
-  #now print the edges:
-  for e in r.edges(data=True):
-    print e
-  r = s_4.compute_residual_graph(r)
-  print "residual graph"
-  for e in r.edges(data=True):
-    print e
-  #call shortest_augmenting_path again
-  r1 = flow.shortest_augmenting_path(G=r, s=8, t='snk', capacity = 'capacity')
-  print "r1 flow value:",r1.graph['flow_value']
-  
-  print "is r modified?-------"
-  for e in r.edges(data=True):
-    print e
-  print "r flow value:",r.graph['flow_value']
-  
-  print "is r1 modified?-------"
-  for e in r1.edges(data=True):
-    print e
-  #now print the edges:
-  #for e in r1.edges(data=True):
-  #  print e
-  #for u in R.nodes():
-  #  for v in R.nodes():
-  #    if u not in ['src','snk',v] and v not in ['src','snk',u]:
-  #      print nx.shortest_path(s_4.g, u, v)
-  
-  #print nx.shortest_path(s_4.g, 'src', v)   
-'''
-  flow_dict = R.graph['flow_dict']
-  print flow_value
-  for i in flow_dict:
-    for j in flow_dict[i]:
-      print "(",i,",",j,"): ",flow_dict[i][j]
-  '''
-  #'''
-  #s_4.print_graph(s_4.g1)
   
   
   
