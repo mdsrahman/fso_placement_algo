@@ -5,6 +5,7 @@ from collections import defaultdict
 from babel._compat import iteritems
 from docutils.parsers.rst.directives import path
 from copy import deepcopy
+from operator import itemgetter
 '''
 S = set of nodes added.
 Initially, S = set of gateways.
@@ -168,34 +169,95 @@ class Step_2_3:
         S.add(t)
         #print "DEBUG:S:",S
     return
+  def get_max_degree_nodes(self,g):
+    n_list=[]
+    non_sink_nodes = set(g.nodes()) - set(self.sinks).intersection(g.nodes())
+    node_degree = nx.degree(g, non_sink_nodes)
+    sorted_node_degree = sorted(node_degree.items(), key=itemgetter(1),reverse=True)
+    #x, max_degree =  sorted_node_degree[0]
+    max_degree = -1
+    for n,degree in sorted_node_degree:
+      if degree >= max_degree:
+        max_degree = degree
+        n_list.append(n)
+      else:
+        break
+    #also send back a candidate list of nodes in sorted order of suitiabiilty
+    candidate_nodes = []
+    candidate_nodes.extend(self.sinks)
+    for n,degree in reversed(sorted_node_degree):
+      if degree <= max_degree - 2:
+        candidate_nodes.append(n)
+      else:
+        break
+    return max_degree, n_list,candidate_nodes
+  def check_node_for_degree_reduction(self, n, cnodes):
+    print "DEBUG@check_for_node_degree_reduction:",n,cnodes
+    for s in self.sinks:
+      bfs_successors = nx.bfs_successors(self.G_p, s)
+      if n in bfs_successors.keys():
+        break
+    else:
+      return False
+    nbr_s = bfs_successors[n]
+    for c in cnodes:
+      for nbr in nbr_s:
+        if self.adj.has_edge(c, nbr):
+          self.G_p.remove_edge(n, nbr)
+          self.G_p.add_edge(c, nbr)
+          print "prev_edge:",n,"-",nbr," new edge:",c,"-",nbr
+          #self.print_graph(self.G_p)
+          return True
+    return False
   def reduce_node_degree(self):
     #add all sinks if not added:
     for s in self.sinks:
       self.G_p.add_node(s)
-      bfs_successors = nx.bfs_successors(self.G_p, s)
-      for i,v in bfs_successors.iteritems():
-        print i,v
+    
+    #for u,v in iteritems(nx.degree(self.G_p)):
+    #  print u,v
+    
+    
+    while True:
+      max_degree, max_deg_nodes, cnodes = self.get_max_degree_nodes(self.G_p)
+      print max_degree,max_deg_nodes,cnodes
+      if max_degree <= 1 or len(max_deg_nodes)==0 or len(cnodes)==0:
+        break
+      degree_reduced = False
+      for n in max_deg_nodes:
+        degree_reduced = self.check_node_for_degree_reduction(n, cnodes)
+        if degree_reduced:
+          break
+      if not degree_reduced:
+        break
+      
+    
+    
+    #bfs_successors = nx.bfs_successors(self.G_p, s)
+
     return
 
 if __name__ == '__main__':
   print "starting run..."
   s_2_3 = Step_2_3()
-  s_2_3.make_problem_instance(num_node = 10, 
-                              num_edge = 25, 
-                              short_edge_fraction = 0.9, 
-                              num_sink = 3, 
-                              num_target = 10, 
-                              max_node_to_target_association =3)
-  for i,v in iteritems(s_2_3.T):
-    print i,v
+  s_2_3.make_problem_instance(num_node = 200, 
+                              num_edge = 400, 
+                              short_edge_fraction = 0.8, 
+                              num_sink = 20, 
+                              num_target = 200, 
+                              max_node_to_target_association =4)
+  #for i,v in iteritems(s_2_3.T):
+  #  print i,v
   s_2_3.greedy_set_cover_targets()
   print "sinks:", s_2_3.sinks
   print "target_connected nodes:",s_2_3.N
   s_2_3.build_backbone_network()
-  s_2_3.print_graph(s_2_3.adj)
-  s_2_3.print_graph(s_2_3.G_p)
+  #s_2_3.print_graph(s_2_3.adj)
+  #s_2_3.print_graph(s_2_3.G_p)
   print "DEBUG:Unconnected Target nodes:",s_2_3.uT
   s_2_3.reduce_node_degree()
+  s_2_3.print_graph(s_2_3.G_p)
+ 
   
   
   
