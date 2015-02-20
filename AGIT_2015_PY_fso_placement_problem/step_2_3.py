@@ -126,11 +126,13 @@ class Step_2_3:
       n = p[n]
     return path
   
-  def find_closest(self, S, T):
+  def find_closest(self, S_in, T):
+    S =list(S_in)
     parent_node ={}
     t=None
     P=[]
     for s in S:
+      #print "DEBUG:S",S
       s_nbr = self.adj.neighbors(s)
       for nbr in s_nbr:
         if nbr not in S and self.adj[s][nbr]['con_type']=='short':
@@ -139,51 +141,61 @@ class Step_2_3:
           if nbr in T:
             t=nbr
             P=self.find_path(parent_node, t)
+            #print  'DEBUG:P',P
             return t,P            
     return t,P
-  def add_path_to_graph_G_p(self,P):
-    if len(P) < 2:
-      self.G_p.add_node(P.pop(0))
-    else:
-      u=P.pop(0)
-      while P:
-        v=P.pop(0)
-        self.G_p.add_edge(u, v)
-        u=v
-    return
+
   def build_backbone_network(self):
-    S=list(self.sinks)
+    self.uT=[]
+    S=set(self.sinks)
     #T=self.T.keys()
-    T= deepcopy(self.N)
+    T= set(self.N)
+    T =  T - S.intersection(T)
     self.G_p = nx.Graph()
     self.G_p.graph['name'] = 'Backbone Graph'
     #G= self.adj # do not modify G
+    
     while T:
       t, P = self.find_closest(S, T)
       if t==None:
+        if len(T)>0:
+          self.uT=deepcopy(T) 
         return
       else:
-        self.add_path_to_graph_G_p(P)
+        self.G_p.add_path(P)
+        #print "DEBUG:S:",S
         T.remove(t)
-        S.append(t)
+        S.add(t)
+        #print "DEBUG:S:",S
     return
+  def reduce_node_degree(self):
+    #add all sinks if not added:
+    for s in self.sinks:
+      self.G_p.add_node(s)
+      bfs_successors = nx.bfs_successors(self.G_p, s)
+      for i,v in bfs_successors.iteritems():
+        print i,v
+    return
+
 if __name__ == '__main__':
   print "starting run..."
   s_2_3 = Step_2_3()
   s_2_3.make_problem_instance(num_node = 10, 
                               num_edge = 25, 
-                              short_edge_fraction = 0.3, 
+                              short_edge_fraction = 0.9, 
                               num_sink = 3, 
                               num_target = 10, 
                               max_node_to_target_association =3)
   for i,v in iteritems(s_2_3.T):
     print i,v
   s_2_3.greedy_set_cover_targets()
-  s_2_3.build_backbone_network()
   print "sinks:", s_2_3.sinks
   print "target_connected nodes:",s_2_3.N
+  s_2_3.build_backbone_network()
   s_2_3.print_graph(s_2_3.adj)
   s_2_3.print_graph(s_2_3.G_p)
+  print "DEBUG:Unconnected Target nodes:",s_2_3.uT
+  s_2_3.reduce_node_degree()
   
   
   
