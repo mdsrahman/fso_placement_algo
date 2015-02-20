@@ -257,6 +257,9 @@ if __name__ == '__main__':
   print "DEBUG:Unconnected Target nodes:",s_2_3.uT
   s_2_3.reduce_node_degree()
   s_2_3.print_graph(s_2_3.G_p)
+  for u,v,d in s_2_3.adj.edges(data='con_type'):
+    if d['con_type']=='short':
+      print u,v,d
  
   
   
