@@ -427,6 +427,9 @@ if __name__ == '__main__':
                           T_N = hp.T_N,
                           sinks = hp.sinks)
   ilp.solve()
+  print "ILP Max FLow:",ilp.max_flow
+  percent_flow = 100.0 * hp.max_capacity / ilp.max_flow
+  print "PERCENT OF RILP:",percent_flow,"%"
  
   
   

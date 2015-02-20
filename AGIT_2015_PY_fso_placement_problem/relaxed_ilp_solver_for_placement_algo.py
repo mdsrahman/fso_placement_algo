@@ -160,7 +160,10 @@ class ILP_Relaxed():
     #----task: set equation (8) and (9)  involving x_i, x_j, e_ij, y_i, y_j, b_ij ---------
     for i in self.adj.nodes():
       for j in self.adj.nodes():
-        fso_placement_prob += e[i][j] <= 0.5 * (x[i] + x[j] ), "eqn_8_("+str(i)+","+str(j)+")"
+        if self.adj.has_edge(i, j):
+          fso_placement_prob += e[i][j] <= 0.5 * (x[i] + x[j] ), "eqn_8_("+str(i)+","+str(j)+")"
+        else:
+          fso_placement_prob += e[i][j] == 0.0, "eqn_8_("+str(i)+","+str(j)+")"
         fso_placement_prob += b[i][j] <= 0.5 * (y[i] + y[j] ), "eqn_9_("+str(i)+","+str(j)+")"
     #***********end_of_task**************************************
     
