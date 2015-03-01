@@ -36,6 +36,8 @@ from  shapely import geometry as shgm
 import geopy.distance
 import numpy as np
 
+import networkx as nx
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
@@ -51,8 +53,8 @@ class MapToGraph():
     self.building_y={} # list of longitude (y) of building corner-points keyed by building id
     #-- the following 4 defines the bounding box of the processed map in terms of lat, lon
     self.node_counter = 0
-    self.node_x={} #all valid nodes latitude (x)
-    self.node_y={} #all valid nodes longitude (y)
+    self.node_x=[] #all valid nodes latitude (x)
+    self.node_y=[] #all valid nodes longitude (y)
     
     self.min_lat = None
     self.max_lat = None
@@ -61,6 +63,9 @@ class MapToGraph():
     
     self.box=None #hashes the buildings according to their coordinates
     self.box_coord = None #stores the coordinate of the boxes
+    self.nbox_dim = None #dimension of 2D box array
+    
+    self.adj = None
     return
   
   def setMapFileName(self,mapFileName):
@@ -115,9 +120,9 @@ class MapToGraph():
               self.building_x[a.attrib['id']].append(blat)
               self.building_y[a.attrib['id']].append(blon)
               #if these are valid building corners, then are also valid nodes
-              self.node_x[self.node_counter] = blat
-              self.node_y[self.node_counter] = blon
-              self.node_counter += 1
+              self.node_x.append(blat)
+              self.node_y.append(blon)
+
             break # careful about this break indentation, it matches within the if{ seqment }
     #print way
     
@@ -140,26 +145,33 @@ class MapToGraph():
                   self.building_x[a.attrib['id']].append(blat)
                   self.building_y[a.attrib['id']].append(blon)
                   #if these are valid building corners, then are also valid nodes
-                  self.node_x[self.node_counter] = blat
-                  self.node_y[self.node_counter] = blon
-                  self.node_counter += 1
+                  self.node_x.append(blat)
+                  self.node_y.append(blon)
+
                 break #once the member = outer found no need to iterate further
             break #the building tag is found, no need to iterate on this element
     # save memory now------
     
-    self.min_lat = float( min( self.node_x.values() ) )
-    self.max_lat = float( max( self.node_x.values() ) ) 
-    self.min_lon = float( min( self.node_y.values() ) )
-    self.max_lon = float( max( self.node_y.values() ) )
+    self.min_lat = float( min( self.node_x ) )
+    self.max_lat = float( max( self.node_x ) ) 
+    self.min_lon = float( min( self.node_y ) )
+    self.max_lon = float( max( self.node_y ) )
     
     del way
     del lat
     del lon
     return
   
-  def get_relative_coord(self,lat,lon):
-    x_ref = geopy.Point(self.min_lat, lon)
-    y_ref = geopy.Point(lat,          self.min_lon)
+  def get_relative_coord(self,lat,lon, in_ref_lat = None, in_ref_lon = None):
+    ref_lat = in_ref_lat
+    if not ref_lat:
+      ref_lat = self.min_lat
+      
+    ref_lon = in_ref_lon
+    if not ref_lon:
+      ref_lon = self.min_lon
+    x_ref = geopy.Point(ref_lat, lon)
+    y_ref = geopy.Point(lat,          ref_lon)
     xy = geopy.Point(lat,lon)
     x = geopy.distance.distance(xy, x_ref).m
     y = geopy.distance.distance(xy, y_ref).m
@@ -248,6 +260,7 @@ class MapToGraph():
   def hash_builidings(self, max_buildings_per_box = 16):
     total_builldings = len(self.building_x)
     nbox_dim =  int(np.ceil( np.sqrt(total_builldings)/ np.sqrt(max_buildings_per_box ) ))
+    self.nbox_dim = nbox_dim
     nbox = nbox_dim * nbox_dim
     
     lat_range = (self.max_lat - self.min_lat)/nbox_dim
@@ -297,6 +310,88 @@ class MapToGraph():
       for j in range(nbox_dim):
         print "DEBUG:i,j:",i,j,":",len(self.box[i][j])
     return
+  
+  def get_box_index(self,lat,lon):
+    for i in range(self.nbox_dim):
+      for j in range(self.nbox_dim):
+        if self.is_member_of_box(i = i, j = j, lat_list = [lat], lon_list = [lon]):
+          return i,j
+    return -1,-1
+  
+  def get_building_set(self, in_i1, in_j1, in_i2 = None, in_j2 = None):
+    if not in_i2 or not in_j2:
+      return list(self.box[in_i1][in_i2])
+    i1 = min(in_i1, in_i2)
+    i2 = max(in_i1, in_i2)
+    j1 = min(in_j1, in_j2)
+    j2 = max(in_j1, in_j2)
+    building_set = []
+    for i in range(i1, i2+1):
+      for j in range(j1, j2+1):
+        building_set.extend(self.box[i][j])
+    return building_set
+  
+  def has_intersected_with_buildings(self, building_ids, lat1, lon1, lat2,  lon2):
+    for bid in building_ids:
+      # build polygon and line objects from params
+      x1,y1 =  self.get_relative_coord(lat1, lon1)
+      x2,y2 =  self.get_relative_coord(lat2, lon2)
+      line  = shgm.LineString([(x1,y1), (x2,y2)])
+      polygon_coord = []
+      building_lat = self.building_x[bid]
+      building_lon = self.building_y[bid]
+      for i,b_lat in enumerate(building_lat):
+        b_lon = building_lon[i]
+        polygon_coord.append( ( self.get_relative_coord(b_lat, b_lon) ) )
+      polygon = shgm.Polygon(polygon_coord)   
+      if polygon.intersects(line)          :
+        return True         
+    return False
+  
+  def build_adj_graph(self, max_fso_dist = 2000, min_fso_dist = 100):
+    flog = open('./map/build_adj_logger.txt','a')
+    flog.write("----------Total Nodes:"+str(len(self.node_x))+'\n')
+    print "DEBUG: Number of nodes:", len(self.node_x)
+    temp = raw_input("Press Enter To Continue:")
+    self.adj = nx.Graph()
+    self.adj.graph['name'] = 'Adjacency Graph'
+    total_nodes = len(self.node_x)
+    for u in range(total_nodes-1):
+      lat_u = self.node_x[u]
+      lon_u = self.node_y[u]
+      for v in range(u+1,total_nodes):
+        print "DEBUG: Processing u,v: ",u,v
+        flog.write("Processing u,v:"+str(u)+','+str(v)+'\n')
+        lat_v = self.node_x[v]
+        lon_v = self.node_y[v]
+        distance = self.get_relative_coord(lat = lat_u, 
+                                             lon = lon_u, 
+                                             in_ref_lat = lat_v, 
+                                             in_ref_lon = lon_v)
+        print "DEBUG:distance:",distance
+        flog.write("\t distance="+str(distance))
+        if distance > max_fso_dist:
+          continue
+        ubox_i, ubox_j = self.get_box_index(lat_u, lon_u)
+        vbox_i, vbox_j = self.get_box_index(lat_v, lon_v)
+        building_ids = self.get_building_set(ubox_i, ubox_j, vbox_i, vbox_j)
+        print "DEBUG: Processing u,v, #buildings: ",u,v,len(building_ids)
+        flog.write("\t number of buildings:"+str(len(building_ids)))
+        if self.has_intersected_with_buildings(building_ids = building_ids, 
+                                                 lat1 = lat_u, 
+                                                 lon1 = lon_u, 
+                                                 lat2 = lat_v, 
+                                                 lon2 = lon_v):
+          flog.write("\t intersected with buildings:")
+          continue
+        else:
+          if distance <= min_fso_dist:
+            self.adj.add_edge(u, v, con_type ='short')
+          else:
+            self.adj.add_edge(u, v, con_type ='long')
+    flog.close()
+    return
+  
   def debug_visualize_buildings(self):
     patches = [] 
     for i in self.building_x.keys():
@@ -316,7 +411,7 @@ class MapToGraph():
     p = PatchCollection(patches, match_original=True)
     ax.add_collection(p)
     #plt.grid(True)
-    
+    '''
     box_dim = len(self.box[0])
     for i in range(box_dim):
       for j in range(box_dim):
@@ -329,6 +424,20 @@ class MapToGraph():
         x3,y3 =  self.get_relative_coord(box_lat_max, box_lon_max)
         x4,y4 =  self.get_relative_coord(box_lat_min, box_lon_max)
         plt.plot([x1, x2, x3, x4, x1],[y1, y2, y3, y4, y1],'r')
+    '''
+    #---also draw edges on the graph----
+    for u,v in self.adj.nodes():
+      ulat = self.node_x[u]
+      ulon = self.node_y[u]
+      vlat = self.node_x[v]
+      vlon = self.node_y[v]
+      x1, y1 = self.get_relative_coord(ulat, ulon)
+      x2, y2 = self.get_relative_coord(vlat, vlon)
+      if self.adj[u][v]['con_type'] == 'short':
+        edge_color = 'g'
+      else:
+        edge_color ='b'
+      plt.plot([x1,x2],[y1,y2],edge_color)
       
     plt.autoscale(enable=True, axis = 'both', tight= True)
     
@@ -336,9 +445,10 @@ class MapToGraph():
     return 
 #-----------------unit testing-------------------#
 if __name__ == '__main__':
-  mtg = MapToGraph('./map/sf.osm')
+  mtg = MapToGraph('./map/sf_v2.osm')
   mtg.load_map()
   mtg.hash_builidings(max_buildings_per_box = 20)
+  mtg.build_adj_graph()
   mtg.debug_visualize_buildings()
 
 
