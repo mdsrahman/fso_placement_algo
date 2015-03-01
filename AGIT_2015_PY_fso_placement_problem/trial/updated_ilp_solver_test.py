@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 import random
 import sys
+from collections import defaultdict
 
 '''steps--------
 pre: build random nx grap instance- targets, adj graphs
@@ -28,8 +29,10 @@ class ILP_Relaxed():
                             num_target,
                             max_node_to_target_association,
                             ):
-    self.T =  np.zeros(shape = (num_target, num_node), dtype = int)
+    #self.T =  np.zeros(shape = (num_target, num_node), dtype = int)
     #-----first make a dense connected graph-----------
+    self.num_node = num_node
+    self.num_target = num_target
     while True: 
       self.adj = nx.dense_gnm_random_graph(num_node,num_edge)
       if nx.is_connected(self.adj):
@@ -52,11 +55,12 @@ class ILP_Relaxed():
         #-------- randomly hooks targets to source nodes-------
     #T is the matrix of size num_tarets x num_nodes
     #self.T =  np.zeros(shape = (num_target, num_node), dtype = bool)
+    self.T_N=defaultdict(list)
     for t in range(num_target):
       num_of_assoc_sources = random.randint(1,max_node_to_target_association)
       assoc_sources = random.sample(self.adj.nodes(),num_of_assoc_sources)
       for n in assoc_sources:
-        self.T[t][n] = 1
+        self.T_N[t].append(n)
     #print self.T
 
   
@@ -161,9 +165,10 @@ class ILP_Relaxed():
     #***********end_of_task**************************************
     
     #----task: set equation (11) aka (12) involving T_ij, y_i  ---------
-    num_targets, num_nodes = self.T.shape
+    num_targets = self.num_target
+    #num_nodes = self.num_node
     for t in range(num_targets):
-      fso_placement_prob += pulp.lpSum( y[i] * self.T[t][i] for i in self.adj.nodes() ) >= 1,\
+      fso_placement_prob += pulp.lpSum( y[i] for i in self.T_N[t] ) >= 1,\
                            "eqn_11_("+str(t)+")"
     #***********end_of_task**************************************
     
@@ -196,8 +201,8 @@ class ILP_Relaxed():
     ''' 
     for i in self.adj.nodes():
       if i not in self.sinks:
-        fso_placement_prob += f_s[i] >= y[i] / N , "eqn_14_L_("+str(i)+")"
-        fso_placement_prob += f_s[i] <= y[i] * N , "eqn_14_U_("+str(i)+")"
+        fso_placement_prob += f_s[i] == y[i] / N , "eqn_14_("+str(i)+")"
+        #fso_placement_prob += f_s[i] <= y[i] * N , "eqn_14_U_("+str(i)+")"
     #***********end_of_task**************************************
     
         
@@ -326,13 +331,12 @@ class ILP_Relaxed():
    
 if __name__ == '__main__':
   ilp = ILP_Relaxed(nmax = 20, dmax = 3)
-  ilp.make_problem_instance(num_node = 50, 
-                            num_edge = 100, 
-                            short_edge_fraction = 0.3, 
-                            num_sink = 10,
-                            num_target = 20,
-                            max_node_to_target_association = 4
-                            )
+  ilp.make_problem_instance(  num_node = 50, 
+                              num_edge = 200, 
+                              short_edge_fraction = 0.5, 
+                              num_sink = 10, 
+                              num_target = 30, 
+                              max_node_to_target_association = 4) 
   ilp.build_lp_instance()
   '''
   prob = LpProblem("FSO Placement Problem", LpMinimize)

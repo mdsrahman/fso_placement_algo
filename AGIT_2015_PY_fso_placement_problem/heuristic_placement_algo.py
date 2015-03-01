@@ -1,14 +1,16 @@
 import networkx as nx
+import networkx.algorithms.flow as flow
 #import numpy as np
 import random 
 from collections import defaultdict
-from babel._compat import iteritems
-from docutils.parsers.rst.directives import path
+#from babel._compat import iteritems
+#from docutils.parsers.rst.directives import path
 from copy import deepcopy
 from operator import itemgetter
-import networkx.algorithms.flow as flow
 
-import relaxed_ilp_solver_for_placement_algo as rilp
+#import pylab
+#import relaxed_ilp_solver_for_placement_algo as rilp
+#from xlwt.Row import adj
 '''
 S = set of nodes added.
 Initially, S = set of gateways.
@@ -39,15 +41,18 @@ task 2: run round-robin BFS, till you hit a new
 
 '''
 class Heuristic_Placement_Algo:
-  def __init__(self, capacity =1.0, seed = 1012915):
+  def __init__(self, capacity, adj, sinks, T , T_N, n_max): #, seed = 101239):
     print "initializing Step_1_2_3_4...."
-    random.seed(seed)  
+    #random.seed(seed)  
     self.capacity = capacity
-    self.adj = None
+    self.adj = deepcopy(adj)
+    self.sinks = deepcopy(sinks)
+    self.T = deepcopy(T)
+    self.T_N = deepcopy(T_N)
     self.G_p = None
     self.g1 = self.G_p # the backbone graph g=(y_i, b_ij)
     self.g =  self.adj # the full graph g1=(x_i, e_ij)
-    
+    self.n_max =  n_max
   def print_graph(self, g):
     if 'name' in g.graph.keys():
       print "graph_name:",g.graph['name']
@@ -65,7 +70,7 @@ class Heuristic_Placement_Algo:
     #print "DEBUG:", F
     D = defaultdict(list)
     L=defaultdict(set)
-    for y,S in iteritems(F):
+    for y,S in F.iteritems():
         for a in S:
             D[a].append(y)
         # Now place sets into an array that tells us which sets have each size
@@ -248,7 +253,7 @@ class Heuristic_Placement_Algo:
     
     
     #bfs_successors = nx.bfs_successors(self.G_p, s)
-
+    self.bg = deepcopy(self.G_p)
     return
     #-----------------related to step 4--------------------
   def add_capacity(self, g, capacity=1.0, src_list=None,  snk_list = None):
@@ -308,7 +313,7 @@ class Heuristic_Placement_Algo:
     #print available_nodes
     
     
-    while(available_nodes):
+    while(available_nodes and self.g1.number_of_nodes() <= self.n_max):
       d = nx.Graph(self.g1)
       #print "DEBUG:type(d):",type(d)
       d = self.add_capacity(g = d, capacity = self.capacity)
@@ -317,7 +322,7 @@ class Heuristic_Placement_Algo:
       max_benefit = - float('inf')
       max_i = max_j = -1
       new_node_list = None
-      
+      backbone_nodes = self.g1.nodes()
       for i in backbone_nodes:
         for j in backbone_nodes:
           #print "DEBUG:(i,j):",i,j
@@ -402,10 +407,18 @@ class Heuristic_Placement_Algo:
     self.max_capacity = r.graph['flow_value']
     return
   
+  def viz_node_colors(self,n):
+    if n in self.sinks:
+      return 'g'
+    elif n in self.bg.nodes():
+      return 'r'
+    else: 
+      return 'b'
 
 if __name__ == '__main__':
   print "starting run..."
-  hp = Heuristic_Placement_Algo()
+  seed = 101397
+  hp = Heuristic_Placement_Algo(adj, T, sinks)
   hp.make_problem_instance(num_node = 50, 
                               num_edge = 200, 
                               short_edge_fraction = 0.5, 
@@ -430,6 +443,15 @@ if __name__ == '__main__':
   print "ILP Max FLow:",ilp.max_flow
   percent_flow = 100.0 * hp.max_capacity / ilp.max_flow
   print "PERCENT OF RILP:",percent_flow,"%"
+  
+  #graph visualizer----
+  node_colors = [hp.viz_node_colors(n) for n in hp.g1.nodes()]
+  edge_colors = ['r' if hp.bg.has_edge(u,v) else 'b' for u,v in hp.g1.edges()]
+  #print edge_colors
+  #print hp.bg.edges()
+  nx.draw(G= hp.g1, node_color = node_colors, edge_color = edge_colors)
+  pylab.show()
+ 
  
   
   
