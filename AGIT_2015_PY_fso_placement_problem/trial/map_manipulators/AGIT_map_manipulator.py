@@ -41,8 +41,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
-
-from collections import defaultdict
+#from matplotlib.backends.backend_pdf import PdfPages
+#from collections import defaultdict
 
 class MapToGraph():
   def __init__(self, mapFileName = None,  max_fso_dist = 2000, min_fso_dist = 100):
@@ -300,8 +300,10 @@ class MapToGraph():
       polygon = Polygon(pcoord, fc='grey')
       #polygon.set_facecolor('none')
       patches.append(polygon) 
+      
     
     fig, ax = plt.subplots()
+    
     p = PatchCollection(patches, match_original=True)
     ax.add_collection(p)
     #plt.grid(True)
@@ -328,14 +330,17 @@ class MapToGraph():
         plt.plot([self.node[u].x, self.node[v].x],\
                  [self.node[u].y, self.node[v].y], color = edge_color,  ls ='dotted')
     
-      
-    plt.autoscale(enable=True, axis = 'both', tight= True)
     
+    ax.autoscale(enable=True, axis = 'both', tight= True)
+    ax.set_aspect('equal', 'box')
+    fig.set_size_inches(10, 10)
+    fig.savefig(self.mapFileName+".pdf", bbox_inches = 'tight')
     plt.show()
+
     return 
 #-----------------unit testing-------------------#
 if __name__ == '__main__':
-  mtg = MapToGraph('./map/nyc_hells_kitchen.osm')  
+  mtg = MapToGraph('./map/dallas_v2.osm')  
   mtg.load_map()
   mtg.hash_builidings(max_buildings_per_box = 20)
   mtg.build_adj_graph()
