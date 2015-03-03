@@ -351,27 +351,29 @@ class MapToGraph():
           xs,ys = zip(*self.box[i][j].exterior.coords)
           plt.plot(xs,ys,'r')'''
     
-    #---also draw edges on the graph----
+    #---plot the sink and other nodes----
     for uindx, u in enumerate(self.node):
       if uindx in self.sinks:
         plt.plot([u.x],[u.y],"gs")
       else:
-        plt.plot([u.x],[u.y],"bo")
-      
+        plt.plot([u.x],[u.y],"bo")      
+    #--- plot the target nodes------
     for u in self.tnode:
       plt.plot([u.x],[u.y],"ro")
-      
+     
     adj = in_adj
     if not adj:
       adj = self.adj
     ##--adj disal
-    adj = None #<-------edge view disabled---
+    #adj = None #<-------edge view disabled---
+
     if adj:
       for u,v in adj.edges():
         if self.adj[u][v]['con_type'] == 'short':
           edge_color = 'g'
         else:
           edge_color ='b'
+        
         plt.plot([self.node[u].x, self.node[v].x],\
                  [self.node[u].y, self.node[v].y], color = edge_color,  ls ='dotted')
     

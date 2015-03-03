@@ -41,7 +41,7 @@ task 2: run round-robin BFS, till you hit a new
 
 '''
 class Heuristic_Placement_Algo:
-  def __init__(self, capacity, adj, sinks, T , T_N, n_max): #, seed = 101239):
+  def __init__(self, capacity, adj, sinks, T , T_N, n_max, static_d_max = 6): #, seed = 101239):
     #print "initializing Step_1_2_3_4...."
     #random.seed(seed)  
     self.capacity = capacity
@@ -53,6 +53,7 @@ class Heuristic_Placement_Algo:
     self.g1 = self.G_p # the backbone graph g=(y_i, b_ij)
     self.g =  self.adj # the full graph g1=(x_i, e_ij)
     self.n_max =  n_max
+    self.static_d_max = static_d_max
   def print_graph(self, g):
     if 'name' in g.graph.keys():
       print "graph_name:",g.graph['name']
@@ -324,7 +325,8 @@ class Heuristic_Placement_Algo:
   
   def run_step_4(self):
     self.g = self.adj
-    self.g1 = self.G_p
+    self.g1 = deepcopy(self.G_p)
+    
     '''#<-- 
     Given a dynamic graph D, "residual graph" G and super-source S and super-sink T.
     while (nodes available to add) {
@@ -378,12 +380,12 @@ class Heuristic_Placement_Algo:
               max_benefit = i_j_path_benefit
               max_i = i
               max_j = j
-              new_node_list = new_nodes_on_i_j_path
+              new_node_list = list(new_nodes_on_i_j_path)
             elif j_i_path_benefit > max_benefit:
               max_benefit =j_i_path_benefit
               max_i = j
               max_j = i
-              new_node_list = new_nodes_on_i_j_path
+              new_node_list = list(new_nodes_on_i_j_path)
             #t= raw_input("press enter:")
       #step vi) update graph g1 with new nodes,edges from i,j 
       #and remove the nodes from list available_nodes
@@ -401,6 +403,139 @@ class Heuristic_Placement_Algo:
           if nbr in self.g1.nodes():
             self.g1.add_edge(n,nbr)
     return
+  
+  def find_static_shortest_path(self, i, j, available_nodes):
+            all_shortest_paths_i_j = nx.all_shortest_paths(G=self.g,source=i,target=j)
+            
+            minimum_node_from_availabe_set = 0
+            min_path = []
+            for p in all_shortest_paths_i_j:
+              #print "DEBUG:p:",p
+              #print "DEBUG:available_set:",available_nodes
+              #first check degree constraint
+              invalid_path = False
+              for nindx, n in enumerate(p):
+                if n in self.static.nodes():
+                  req_degree = 2
+                  if nindx > 0 and self.static.has_edge(p[nindx - 1], p[nindx]):
+                    req_degree -= 1
+                  if nindx < len(p)-1 and self.static.has_edge(p[nindx], p[nindx+1]):
+                    req_degree -= 1
+                  if self.static.degree(n)+req_degree > self.static_d_max:
+                    invalid_path = True
+                    break
+              if invalid_path:
+                continue
+              available_node_count = len(p) - len(set(p) - set(available_nodes))
+              if available_node_count > minimum_node_from_availabe_set:
+                minimum_node_from_availabe_set = available_node_count
+                min_path = p
+              #find the minimum number of external-node shortest paths
+              
+            #i_j_path = nx.shortest_path(self.g, i, j)
+            
+            i_j_path = min_path
+            #print "DEBUG: i_j_path: ",i_j_path
+            if len(i_j_path)<=2: 
+              return [], 0
+            new_nodes_on_i_j_path = []
+            for n in i_j_path:
+              if n in available_nodes:
+                new_nodes_on_i_j_path.append(n)
+            return i_j_path, len(new_nodes_on_i_j_path)
+  
+  def run_static_step_4(self):
+    #print "DEBUG: running run_static_step_4()....."
+    self.g = self.adj
+    self.static = deepcopy(self.G_p)
+    #find set of nodes still available to add to dynamic graph static to from input graph g
+    backbone_nodes = self.static.nodes()
+    #print "DEBUG:backbone_nodes:",backbone_nodes
+    available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
+    #print available_nodes
+    
+    
+    while(available_nodes and self.static.number_of_nodes() <= self.n_max):
+      #print "DEBUG: Available nodes:",len(available_nodes),\
+      #      " current nodes:",self.static.number_of_nodes(),"------"
+      d = nx.Graph(self.static)
+      #print "DEBUG:type(d):",type(d)
+      d = self.add_capacity(g = d, capacity = self.capacity)
+      #print "DEBUG:type(d):",type(d)
+      #print d.has_node('src')
+      max_benefit = - float('inf')
+      max_i = max_j = -1
+      new_node_list = None
+      backbone_nodes = self.static.nodes()
+      total_bnodes = len(backbone_nodes)
+      for c1 in range(total_bnodes-1):
+        for c2 in range(c1+1, total_bnodes):
+          #print "DEBUG:", c1,c2
+          i = backbone_nodes[c1]
+          j = backbone_nodes[c2]
+          i_j_path, new_node_count = self.find_static_shortest_path(i, j, available_nodes)
+          #print "DEBUG:", c1,c2,i_j_path,new_node_count
+          if  new_node_count < 1:
+            continue
+          #print "DEBUG:(i,j):",i,j
+          if i !=j:
+            #step i) run max-flow and get the dynamic graph static and compute the residual graph
+            r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
+            r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+            
+            i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
+            j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
+            if i_j_path_benefit > max_benefit:
+              max_benefit = i_j_path_benefit
+              max_i = i
+              max_j = j
+              max_i_j_path = list(i_j_path)
+            elif j_i_path_benefit > max_benefit:
+              max_benefit =j_i_path_benefit
+              max_i = j
+              max_j = i
+              #print  "\t\tDEBUG: i_j_path", list(reversed(i_j_path))
+              max_i_j_path  = list(reversed(i_j_path))
+            #t= raw_input("press enter:")
+      #step vi) update graph static with new nodes,edges from i,j 
+      #and remove the nodes from list available_nodes
+      if max_i == -1:
+        break #no i,j found
+      #otherwise add the paths:
+      #print "DEBUG: new_nodes_added:",new_node_list
+      #print "DEBUG: available_nodes:",available_nodes
+      #else add the path to the static graph
+      for n in max_i_j_path:
+        if n in available_nodes:
+          available_nodes.remove(n)
+      self.static.add_path(max_i_j_path)
+
+    #now check for the less-degree nodes 
+    static_nodes = self.static.nodes()
+    len_static_nodes = len(static_nodes)
+    #print "DEBUG: processing single edge addition..."
+    for uindx in range(len_static_nodes - 1):
+      #print "DEBUG: uindx:",uindx
+      u = static_nodes[uindx]
+      if self.static.degree(u)+1 > self.static_d_max:
+        continue
+      #edge_created = True 
+      for vindx in range(uindx+1, len_static_nodes):
+        v= static_nodes[vindx]
+        if self.static.degree(v)+1 > self.static_d_max:
+          continue
+        if self.adj.has_edge(u,v):
+          self.static.add_edge(u,v)
+        if self.static.degree(u)+1 > self.static_d_max:
+          break 
+    return
+
+
+  def find_static_upperbound(self, capacity = 10.0):
+    #****come back here------
+      
+    return 0
+
   def solve(self):
     self.greedy_set_cover_targets()
     self.build_backbone_network()
@@ -413,6 +548,15 @@ class Heuristic_Placement_Algo:
     d = self.add_capacity(g = d, capacity = self.capacity)
     r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
     self.max_flow = r.graph['flow_value']
+    
+    
+    self.run_static_step_4()
+    #self.print_graph(self.g1)
+    static_d = nx.Graph(self.static)
+      #print "DEBUG:type(d):",type(d)
+    static_d = self.add_capacity(g = static_d, capacity = self.capacity)
+    static_r = flow.shortest_augmenting_path(G=static_d, s='src', t='snk', capacity = 'capacity')
+    self.static_max_flow = static_r.graph['flow_value']
     return
   
   def viz_node_colors(self,n):
