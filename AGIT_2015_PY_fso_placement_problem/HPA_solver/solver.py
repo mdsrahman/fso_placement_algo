@@ -13,7 +13,7 @@ def create_dynamic_graph_spec(filename, g, sources, sinks, fso_count = 6, capaci
   f=open(filename,"w")
   #-------trafficSources-------:
   f.write("trafficSources:\n")
-  for n in sources:
+  for n in g.nodes():
     f.write(str(n)+"\n")
   f.write('\n')
   
@@ -55,11 +55,10 @@ if __name__ == '__main__':
   seed = 101973  
   max_allowed_node = 400
   max_allowed_edge = 3000
-  mapfiles = ['./map/dallas_v1.osm', #]#,\
-           './map/dallas_v3.osm',
-           './map/nyc_hells_kitchen.osm']
-           #'./map/nyc_hells_kitchen.osm']
-  target_to_node_ratio = 0.4
+  mapfiles = ['./map/dallas_v1.osm',
+           './map/dallas_v3.osm'] 
+
+  target_granularity = 10.0 #meter
   sink_to_node_ratio = 0.05
   n_max_ratio = 0.5
   capacity = 10.0
@@ -81,7 +80,7 @@ if __name__ == '__main__':
     adj, sinks, T, T_N, node, tnode \
     =\
     mtg.generate_graph(fileName= mfile,  
-                     target_to_node_ratio = target_to_node_ratio, 
+                     target_granularity = target_granularity, 
                      sink_to_node_ratio = sink_to_node_ratio)
     #-----------------------------------------------------------------------
     #*************************************
@@ -92,9 +91,10 @@ if __name__ == '__main__':
     if adj.number_of_nodes() > max_allowed_node or adj.number_of_edges() > max_allowed_edge:
       print "Skipping sample....too many nodes/edges generated"
       continue
+    print"Running Heurisitc Placement Algo...."
     n_max = int(n_max_ratio * adj.number_of_nodes())
     #print  "DEBUG: n_max: ", n_max
-    hp = hpa.Heuristic_Placement_Algo(    capacity =1.0, 
+    hp = hpa.Heuristic_Placement_Algo(    capacity = 1.0, #capacity normalized
                                           adj = adj, 
                                           sinks = sinks, 
                                           T = T, 
@@ -108,6 +108,7 @@ if __name__ == '__main__':
     #*************************************
     #    relaxed ILP solver          
     #************************************* 
+    print "Running Relaxed ILP...."
     ilp = rilp.ILP_Relaxed(nmax = n_max,
                             dmax = hp.d_max,
                             adj = adj,
@@ -117,8 +118,10 @@ if __name__ == '__main__':
     #print ilp.max_flow
     d_i_ratio = 100.0*hp.max_flow/ilp.max_flow
     s_d_ratio = 100.0*hp.static_max_flow/ilp.max_flow
+    static_avg_max_flow, static_avg_upbound_flow = \
+            hp.find_static_average_flow()
     print "------------------>",s_d_ratio, d_i_ratio
-    mtg.generate_visual_map(in_adj = hp.static)
+    mtg.generate_visual_map(in_adj = hp.G_p)
     #current tasks:-----
     '''
     i) create traffic pattern
@@ -149,11 +152,12 @@ if __name__ == '__main__':
                   ','+str(capacity * hp.max_flow)+\
                   ','+str(capacity * ilp.max_flow)+\
                   ','+str(capacity * hp.static_max_flow)+\
-                  ','+str('staic_avg_flow')+\
-                  ','+str('static_upper_bound_flow')
+                  ','+str(capacity * static_avg_max_flow)+\
+                  ','+str(capacity * static_avg_upbound_flow)
     f.write(stat_string+'\n')
-    print hp.sources
+    #print hp.sources
   f.close()
+  
    
     
     

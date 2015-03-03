@@ -292,14 +292,24 @@ class MapToGraph():
           self.adj.add_edge(u, v, con_type = edge_type)
     return
   
-  def generate_targets(self, target_to_node_ratio = 0.4):
+  def generate_targets(self, target_granularity = 10.0):
     self.tnode=[]
-    total_targets = int( self.adj.number_of_nodes() * 0.4 )
-    for t in range(total_targets):
-      tx = round(random.uniform(0, self.max_x),2)
-      ty = round(random.uniform(0, self.max_y),2)
-      self.tnode.append(shgm.Point(tx,ty))
+    tx = 0.0
+    ty = 0.0
+    while(tx <= self.max_x):
+      while(ty <= self.max_y):
+        self.tnode.append(shgm.Point(tx,ty))
+        ty += target_granularity
+      tx += target_granularity
+      ty = 0.0
+        
+    #total_targets = int( self.adj.number_of_nodes() * 0.4 )
+    #for t in range(total_targets):
+    #  tx = round(random.uniform(0, self.max_x),2)
+    #  ty = round(random.uniform(0, self.max_y),2)
+    #  self.tnode.append(shgm.Point(tx,ty))
     #print "DEBUG: Total Targets: ",len(self.tnode)
+    
     return
 
   def associate_targets(self):
@@ -319,11 +329,11 @@ class MapToGraph():
     self.sinks = random.sample(self.adj.nodes(), num_sinks)
     #print "DEBUG:sinks:",self.sinks
     return
-  def generate_graph(self, fileName, target_to_node_ratio, sink_to_node_ratio):
+  def generate_graph(self, fileName, target_granularity, sink_to_node_ratio):
     self.load_map(fileName)
     self.hash_builidings()
     self.build_adj_graph()
-    self.generate_targets(target_to_node_ratio = target_to_node_ratio)
+    self.generate_targets(target_granularity= target_granularity)
     self.associate_targets()
     self.select_sinks(sink_ratio = sink_to_node_ratio)
     #self.debug_visualize_buildings()
@@ -358,8 +368,8 @@ class MapToGraph():
       else:
         plt.plot([u.x],[u.y],"bo")      
     #--- plot the target nodes------
-    for u in self.tnode:
-      plt.plot([u.x],[u.y],"ro")
+    #for u in self.tnode:
+    #  plt.plot([u.x],[u.y],"ro")
      
     adj = in_adj
     if not adj:

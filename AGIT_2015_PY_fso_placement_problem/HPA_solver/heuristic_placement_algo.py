@@ -5,6 +5,7 @@ import random
 from collections import defaultdict
 #from babel._compat import iteritems
 #from docutils.parsers.rst.directives import path
+from numpy import mean
 from copy import deepcopy
 from operator import itemgetter
 
@@ -254,7 +255,7 @@ class Heuristic_Placement_Algo:
     
     
     #bfs_successors = nx.bfs_successors(self.G_p, s)
-    self.bg = deepcopy(self.G_p)
+    #self.bg = deepcopy(self.G_p)
     return
     #-----------------related to step 4--------------------
   def add_capacity(self, g, capacity=1.0, src_list=None,  snk_list = None):
@@ -262,14 +263,14 @@ class Heuristic_Placement_Algo:
     if snk_list == None: snk_list=self.sinks
     
     g.add_node('src')
-    for i in self.sources:
+    for i in src_list:
       g.add_edge('src',i)
     
     g.add_node('snk')
-    for i in self.sinks:
+    for i in snk_list:
       g.add_edge(i,'snk')
       
-    edge_set =  g.edges()
+    edge_set = g.edges()
     for x,y in edge_set:
       g.edge[x][y]['capacity'] = capacity
       
@@ -531,16 +532,57 @@ class Heuristic_Placement_Algo:
     return
 
 
-  def find_static_upperbound(self, capacity = 10.0):
-    #****come back here------
+  def find_static_average_flow(self, num_iterations = 100, source_ratio = 0.05):
+    print "\t\t@heurisitc placement algo: step: finding static graph avg. flows"
+    self.static_avg_flow = 0.0
+    self.static_upper_bound_flow = 0.0
+    source_sample_size = int(source_ratio * self.static.number_of_nodes())
+    
+    sample_flow_vals = []
+    sample_upper_bound_flow_vals = []
+    
+    allowed_sources = []
+    for n in self.static.nodes():
+      if n not in self.sinks:
+        allowed_sources.append(n)
+        
+    sink_list = []
+    for n in self.sinks:
+      if self.static.has_node(n):
+        sink_list.append(n)
+        
+    for i in range(num_iterations):
+      #choose source_ratio nodes randomly
+      sources = random.sample(allowed_sources,source_sample_size)
       
-    return 0
+
+      #run flow algo and find max flow
+      static_d = nx.Graph(self.static)
+      #print "DEBUG:@find_static_average_flow(): static_d nodes:",static_d.nodes()
+      #print "DEBUG:@find_static_average_flow(): static_d src_list:",sources
+
+      static_d = self.add_capacity(g = static_d, 
+                                   capacity = self.capacity, 
+                                   src_list = sources,
+                                   snk_list= sink_list)
+      #print "DEBUG:s-t path:", [p for p in nx.all_shortest_paths(G=static_d,source='src',target='snk')]
+      static_r = flow.shortest_augmenting_path(G=static_d, s='src', t='snk', capacity = 'capacity')
+      #set avg_flow and upper_bound_flows
+      sample_flow_vals.append(static_r.graph['flow_value'])
+      sample_upper_bound_flow_vals.append( sum(self.static.degree(sources).values()) )
+    avg_max_flow_val = mean(sample_flow_vals)
+    avg_upper_bound_flow_val = mean(sample_upper_bound_flow_vals)
+    return avg_max_flow_val, avg_upper_bound_flow_val
 
   def solve(self):
+    print "\t@heurisitc placement algo: step i: running greedy target cover...."
     self.greedy_set_cover_targets()
+    print "\t@heurisitc placement algo: step ii: building backbone network...."
     self.build_backbone_network()
+    print "\t@heurisitc placement algo: step iii: reducing node degree...."
     self.reduce_node_degree()
     
+    print "\t@heurisitc placement algo: step iv-a: builidng dynamic graph...."
     self.run_step_4()
     #self.print_graph(self.g1)
     d = nx.Graph(self.g1)
@@ -549,7 +591,7 @@ class Heuristic_Placement_Algo:
     r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
     self.max_flow = r.graph['flow_value']
     
-    
+    print "\t@heurisitc placement algo: step iv-b: builidng static graph...."
     self.run_static_step_4()
     #self.print_graph(self.g1)
     static_d = nx.Graph(self.static)
@@ -559,13 +601,13 @@ class Heuristic_Placement_Algo:
     self.static_max_flow = static_r.graph['flow_value']
     return
   
-  def viz_node_colors(self,n):
-    if n in self.sinks:
-      return 'g'
-    elif n in self.bg.nodes():
-      return 'r'
-    else: 
-      return 'b'
+  #def viz_node_colors(self,n):
+  #  if n in self.sinks:
+  #    return 'g'
+  #  elif n in self.bg.nodes():
+  #    return 'r'
+  #  else: 
+  #    return 'b'
 
  
  
