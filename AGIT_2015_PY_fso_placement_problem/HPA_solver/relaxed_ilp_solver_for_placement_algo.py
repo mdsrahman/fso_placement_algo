@@ -174,10 +174,13 @@ class ILP_Relaxed():
     #***********end_of_task**************************************
     
     #----task: set equation (11) aka (12) involving T_ij, y_i  ---------
-    num_targets = len(self.T_N)
+    #num_targets = len(self.T_N)
     #num_nodes = self.num_node
-    for t in range(num_targets):
-      fso_placement_prob += pulp.lpSum( y[i] for i in self.T_N[t] ) >= 1,\
+    #for t in range(num_targets):
+    for t in self.T_N.keys():
+      #print "DEBUG @relaxed_ilp:T_N[t]",t,":",self.T_N[t]
+      #print "DEBUG @relaxed_ilp:total-ys:",y
+      fso_placement_prob += pulp.lpSum( y[i] for i in self.T_N[t] if i in y.keys()) >= 1,\
                            "eqn_11_("+str(t)+")"
     #***********end_of_task**************************************
     

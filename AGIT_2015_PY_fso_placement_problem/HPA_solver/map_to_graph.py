@@ -38,6 +38,7 @@ import numpy as np
 import random
 
 import networkx as nx
+import time
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -71,13 +72,26 @@ class MapToGraph():
     self.building_in_box = None
     self.adj = None
     self.tnode = None
+    self.sinks = None
+    self.last_time = time.time()
     return
   
   def setMapFileName(self,mapFileName):
     '''sets the mapFileName as class data'''
     self.mapFileName = mapFileName
-    
-  def load_map(self, mapFileName = None):
+  
+  def find_closest_point_indx(self, ref_x, ref_y, xs, ys):
+    min_dist_indx = -1
+    min_dist = float('inf')
+    for indx,x in enumerate(xs):
+      y=ys[indx]
+      line = shgm.LineString( [(ref_x,ref_y),(x,y)])
+      if min_dist > line.length:
+        min_dist_indx = indx
+        min_dist = line.length 
+    return min_dist_indx
+  
+  def load_map(self, mapFileName = None, bounding_box_nodes_only = False):
     '''
     load the specified xml/osm file and generate the building_x, building_y for latitude and
     longitude of building corners
@@ -100,9 +114,11 @@ class MapToGraph():
     way = {} #temporarily keeps all the id's of the ways
     building_lat = {}
     building_lon = {}
-
-    node_lat = []
-    node_lon = []
+    self.min_lat = self.min_lon = float('inf')
+    self.max_x = self.max_y = self.max_lat = self.max_lon = - float('inf')
+     
+    #node_lat = []
+    #node_lon = []
     
     for n in root.iter('node'): # loads all the node lat,lon
       lat[n.attrib['id']] = float(n.attrib['lat'])
@@ -130,9 +146,15 @@ class MapToGraph():
               blon = float(lon[n.attrib['ref']])
               building_lat[a.attrib['id']].append(blat)
               building_lon[a.attrib['id']].append(blon)
+              self.min_lat = min(self.min_lat, blat)
+              self.min_lon = min(self.min_lon, blon)
+              self.max_lat = max(self.max_lat, blat)
+              self.max_lon = max(self.max_lon, blon)
               #if these are valid building corners, then are also valid nodes
-              node_lat.append(blat)
-              node_lon.append(blon)
+              #if not bounding_box_nodes_only:
+              #node_lat.append(blat)
+              #node_lon.append(blon)
+              #else: #take only 4 nodes from the bounding box
             break # careful about this break indentation, it matches within the if{ seqment }
     #print way
     
@@ -148,24 +170,34 @@ class MapToGraph():
                   continue
                 bnodes = way[n.attrib['ref']]
                 #print "------building----",a.tag
+                
+                if len(bnodes)>300: #if too much curvature, skip it
+                  del building_lat[a.attrib['id']]
+                  del building_lon[a.attrib['id']]
+                  continue
                 for i in bnodes:
                   #print lat[i],",",lon[i]
                   blat = float(lat[i])
                   blon = float(lon[i])
                   building_lat[a.attrib['id']].append(blat)
                   building_lon[a.attrib['id']].append(blon)
+                  self.min_lat = min(self.min_lat, blat)
+                  self.min_lon = min(self.min_lon, blon)
+                  self.max_lat = max(self.max_lat, blat)
+                  self.max_lon = max(self.max_lon, blon)
                   #if these are valid building corners, then are also valid nodes
-                  node_lat.append(blat)
-                  node_lon.append(blon)
+                  #if not bounding_box_nodes_only:
+                  #node_lat.append(blat)
+                  #node_lon.append(blon)
 
                 break #once the member = outer found no need to iterate further
             break #the building tag is found, no need to iterate on this element
     # save memory now------
     
-    self.min_lat = float( min( node_lat ) )
-    self.max_lat = float( max( node_lat ) ) 
-    self.min_lon = float( min( node_lon ) )
-    self.max_lon = float( max( node_lon) )
+    #self.min_lat = float( min( node_lat ) )
+    #self.max_lat = float( max( node_lat ) ) 
+    #self.min_lon = float( min( node_lon ) )
+    #self.max_lon = float( max( node_lon) )
     
     del way
     del lat
@@ -174,6 +206,8 @@ class MapToGraph():
     #now build the cartesian coordinate for buildings
     for bid in building_lat.keys():
       blats =  building_lat[bid]
+      #if len(blats)>200:# too many points for a single building !!!!!!!
+      #  continue
       blons = building_lon[bid]
       xs = []
       ys = []
@@ -185,22 +219,59 @@ class MapToGraph():
                                       in_ref_lon = self.min_lon)
         xs.append(x)
         ys.append(y)
-      self.building.append(shgm.Polygon(zip(xs,ys)))
+      #print "DEBUG:@map_to_graph::load_map(..):len xs, len ys:",len(xs),len(ys)
+      if xs[0]== xs[-1] and ys[0]==ys[-1]:
+        del xs[-1]
+        del ys[-1]
+        #print "DEBUG:true"
+      if len(xs)>2 and len(ys)>2:
+        bldg = shgm.Polygon(zip(xs,ys))
+        self.building.append(bldg)
+        #bmin_x, bmin_y, bmax_x, bmax_y = bldg.bounds
+        #print "DEBUG:",bmin_x, bmin_y, bmax_x, bmax_y
+        self.max_x = max(xs+[self.max_x])
+        self.max_y = max(ys+[self.max_y])
+        if not bounding_box_nodes_only or len(xs)<=4:
+          for x,y in zip(xs,ys):
+            self.node.append(shgm.Point(x,y))
+          
+        else:
+          #generate the bounding box,
+          bmin_x, bmin_y, bmax_x, bmax_y = bldg.bounds
+          ref_xs = [bmin_x, bmax_x, bmax_x, bmin_x]
+          ref_ys = [bmin_y, bmin_y, bmax_y, bmax_y]
+          for ref_x, ref_y in zip(ref_xs, ref_ys):
+            if len(xs)<=0:
+              break
+            indx = self.find_closest_point_indx(ref_x = ref_x,
+                                                  ref_y = ref_y,
+                                                  xs = xs,
+                                                  ys = ys)
+            x = xs.pop(indx)
+            y = ys.pop(indx)
+            self.node.append(shgm.Point(x,y))
+          #select exactly four points closest to the bounding box
+          #add only these four points to the node list as point object
+        #now if 
     #also build the cartesian products for the nodes:
     del building_lat
     del building_lon
-    for i,nlat in enumerate(node_lat):
-      nlon = node_lon[i]
-      x,y = self.get_relative_coord(lat = nlat, 
-                                    lon = nlon, 
-                                    in_ref_lat = self.min_lat, 
-                                    in_ref_lon = self.min_lon) 
-      self.node.append(shgm.Point(x,y))
-      self.max_x = max(self.max_x, x)
-      self.max_y = max(self.max_y, y)
+    
+    #for i,nlat in enumerate(node_lat):
+    #  nlon = node_lon[i]
+    #  x,y = self.get_relative_coord(lat = nlat, 
+    #                                lon = nlon, 
+    #                                in_ref_lat = self.min_lat, 
+    #                                in_ref_lon = self.min_lon) 
+    #  self.node.append(shgm.Point(x,y))
+    #  self.max_x = max(self.max_x, x)
+    #  self.max_y = max(self.max_y, y)
     print "\t>>Total Nodes to be processed: ",len(self.node)
-    del node_lat
-    del node_lon
+    #print "DEBUG:-------------"
+    #for bld in self.building:
+    #  print "DEBUG: building_coord:",list(bld.exterior.coords)
+    #del node_lat
+    #del node_lon
     return
   
   def get_relative_coord(self,lat,lon, in_ref_lat = None, in_ref_lon = None):
@@ -252,6 +323,7 @@ class MapToGraph():
         for j in range(nbox_dim):
           if bld.intersects( self.box[i][j]):
             self.building_in_box[i][j].append(bindx)
+    print "\t\t\tDEBUG:Total boxes:",nbox_dim*nbox_dim
     '''      
     for i in range(nbox_dim):
       for j in range(nbox_dim):
@@ -286,6 +358,9 @@ class MapToGraph():
     total_nodes = len(self.node)
     ##check the line intersection with each of the box: for each box, check intersection with each of the bld in it
     for u in range(total_nodes-1):
+      if total_nodes>100: #give status:
+        #if u%100 == 0:
+        print "\t\t Building edges for node# ",u
       for v in range(u+1,total_nodes):
         edge_type = self.check_edge_type(u,v)
         if edge_type =='short' or edge_type =='long':
@@ -323,23 +398,47 @@ class MapToGraph():
           self.T[nindx].add(tindx) #node n covers target t
           self.T_N[tindx].append(nindx)
     return
-  def select_sinks(self, sink_ratio = 0.05):
+  def select_sinks(self, sink_ratio = 0.01):
     self.sinks = []
-    num_sinks = int(sink_ratio*self.adj.number_of_nodes())
+    num_sinks = int(np.ceil((sink_ratio*np.sqrt(len(self.tnode))))) #<---now parred with targets
+    
     self.sinks = random.sample(self.adj.nodes(), num_sinks)
+    print "DEBUG:no_of_sink_nodes: ",num_sinks
     #print "DEBUG:sinks:",self.sinks
     return
-  def generate_graph(self, fileName, target_granularity, sink_to_node_ratio):
-    self.load_map(fileName)
-    self.hash_builidings()
-    self.build_adj_graph()
+  def generate_graph(self, fileName, target_granularity, sink_to_node_ratio, bounding_box_nodes_only = False):
+    self.last_time = time.time()
+    self.load_map(fileName, bounding_box_nodes_only = bounding_box_nodes_only)
+    print"\t\t Time taken:",time.time() - self.last_time,"sec"
+    self.last_time = time.time()
+    
+    
+    print "\t\tassociating targets to nodes.."
     self.generate_targets(target_granularity= target_granularity)
     self.associate_targets()
+    print"\t\t Time taken:",time.time() - self.last_time,"sec"
+    self.last_time = time.time()
+    
+    
+    self.generate_visual_map()#<----just for debugging
+    
+    
+    print "\t\thashing building obstacle positions..."
+    self.hash_builidings()
+    print"\t\t Time taken:",time.time() - self.last_time,"sec"
+    self.last_time = time.time()
+    
+    print "\t\tbulding adjacency graph..."
+    self.build_adj_graph()
+    print"\t\t Time taken:",time.time() - self.last_time,"sec"
+    self.last_time = time.time()
+    
     self.select_sinks(sink_ratio = sink_to_node_ratio)
+    self.generate_visual_map()#<----just for debugging
     #self.debug_visualize_buildings()
     return self.adj, self.sinks, self.T, self.T_N, self.node, self.tnode
   
-  def generate_visual_map(self, in_adj = None):
+  def generate_visual_map(self, adj = None):
     patches = [] 
     for bldg in self.building:
       #print "bid:",i,"------------------------------" 
@@ -362,18 +461,19 @@ class MapToGraph():
           plt.plot(xs,ys,'r')'''
     
     #---plot the sink and other nodes----
+    #print "DEBUG:@generate_visual_map", self.sinks
     for uindx, u in enumerate(self.node):
-      if uindx in self.sinks:
-        plt.plot([u.x],[u.y],"gs")
+      if self.sinks and uindx in self.sinks:
+        plt.plot([u.x],[u.y],"gs") 
       else:
         plt.plot([u.x],[u.y],"bo")      
     #--- plot the target nodes------
     #for u in self.tnode:
     #  plt.plot([u.x],[u.y],"ro")
      
-    adj = in_adj
-    if not adj:
-      adj = self.adj
+    #adj = in_adj
+    #if not adj:
+    #  adj = self.adj
     ##--adj disal
     #adj = None #<-------edge view disabled---
 

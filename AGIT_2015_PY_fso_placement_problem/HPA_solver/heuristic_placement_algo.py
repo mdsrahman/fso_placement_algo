@@ -5,9 +5,12 @@ import random
 from collections import defaultdict
 #from babel._compat import iteritems
 #from docutils.parsers.rst.directives import path
-from numpy import mean
+from numpy import mean,ceil
 from copy import deepcopy
 from operator import itemgetter
+from networkx.algorithms.shortest_paths.generic import all_shortest_paths
+import operator as op
+
 
 #import pylab
 #import relaxed_ilp_solver_for_placement_algo as rilp
@@ -55,6 +58,12 @@ class Heuristic_Placement_Algo:
     self.g =  self.adj # the full graph g1=(x_i, e_ij)
     self.n_max =  n_max
     self.static_d_max = static_d_max
+    #self.full_adj_max_flow = None
+    self.avg_max_flow_val =  None
+    self.avg_upper_bound_flow_val = None
+    
+    self.shortest_path_cache={}
+    
   def print_graph(self, g):
     if 'name' in g.graph.keys():
       print "graph_name:",g.graph['name']
@@ -137,7 +146,7 @@ class Heuristic_Placement_Algo:
       for n in assoc_sources:
         self.T[n].add(t) #node n covers target t
         self.T_N[t].append(n)
-    
+
   def find_path(self,p,t):
     n = t
     path=[n]
@@ -290,8 +299,13 @@ class Heuristic_Placement_Algo:
     return g
   
   def find_shortest_path_new_nodes(self, i, j, available_nodes):
-            all_shortest_paths_i_j = nx.all_shortest_paths(G=self.g,source=i,target=j)
-            
+
+            if (i,j) not in self.shortest_path_cache.keys():
+              self.shortest_path_cache[(i,j)] = list(nx.all_shortest_paths(G=self.g,source=i,target=j))
+
+              
+            all_shortest_paths_i_j = list(self.shortest_path_cache[(i,j)])
+            #print "DEBUG:@find_shortest_path_new_nodes:",all_shortest_paths_i_j
             minimum_node_from_availabe_set = 0
             min_path = []
             for p in all_shortest_paths_i_j:
@@ -349,18 +363,32 @@ class Heuristic_Placement_Algo:
     available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
     #print available_nodes
     
-    
+    iter_counter = 0
     while(available_nodes and self.g1.number_of_nodes() <= self.n_max):
+      iter_counter += 1
+      print "\t\tDEBUG: iteration no:",iter_counter,\
+        " available nodes:",len(available_nodes),\
+        " allowable nodes:",self.n_max - self.g1.number_of_nodes(),\
+        " current nodes:",self.g1.number_of_nodes()
       d = nx.Graph(self.g1)
       #print "DEBUG:type(d):",type(d)
-      d = self.add_capacity(g = d, capacity = self.capacity)
+      
       #print "DEBUG:type(d):",type(d)
       #print d.has_node('src')
       max_benefit = - float('inf')
       max_i = max_j = -1
+      
       new_node_list = None
+      
       backbone_nodes = self.g1.nodes()
       total_bnodes = len(backbone_nodes)
+      
+      src_list = list(set(self.g1.nodes()) - set(self.sinks))
+      
+      d = self.add_capacity(g = d, src_list = src_list, capacity = self.capacity)
+      r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
+      r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+      
       for c1 in range(total_bnodes-1):
         for c2 in range(c1+1, total_bnodes):
           i = backbone_nodes[c1]
@@ -372,8 +400,8 @@ class Heuristic_Placement_Algo:
           #print "DEBUG:(i,j):",i,j
           if i !=j:
             #step i) run max-flow and get the dynamic graph g1 and compute the residual graph
-            r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
-            r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+            #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', src_list = src_list, capacity = 'capacity')
+            #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
             
             i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
             j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
@@ -406,8 +434,12 @@ class Heuristic_Placement_Algo:
     return
   
   def find_static_shortest_path(self, i, j, available_nodes):
-            all_shortest_paths_i_j = nx.all_shortest_paths(G=self.g,source=i,target=j)
-            
+            if (i,j) not in self.shortest_path_cache.keys():
+              self.shortest_path_cache[(i,j)] = list(nx.all_shortest_paths(G=self.g,source=i,target=j))
+
+              
+            all_shortest_paths_i_j = list(self.shortest_path_cache[(i,j)])
+            #print "DEBUG:@find_static_shortest_path:",all_shortest_paths_i_j
             minimum_node_from_availabe_set = 0
             min_path = []
             for p in all_shortest_paths_i_j:
@@ -455,34 +487,47 @@ class Heuristic_Placement_Algo:
     available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
     #print available_nodes
     
-    
+    iter_counter = 0
     while(available_nodes and self.static.number_of_nodes() <= self.n_max):
+      iter_counter += 1
+      print "\t\tDEBUG: iteration no:",iter_counter,\
+        " available nodes:",len(available_nodes),\
+        " allowable nodes:",self.n_max - self.static.number_of_nodes(),\
+        " current nodes:",self.static.number_of_nodes() 
       #print "DEBUG: Available nodes:",len(available_nodes),\
       #      " current nodes:",self.static.number_of_nodes(),"------"
       d = nx.Graph(self.static)
       #print "DEBUG:type(d):",type(d)
-      d = self.add_capacity(g = d, capacity = self.capacity)
+      
       #print "DEBUG:type(d):",type(d)
       #print d.has_node('src')
       max_benefit = - float('inf')
       max_i = max_j = -1
-      new_node_list = None
+      #new_node_list = None
       backbone_nodes = self.static.nodes()
       total_bnodes = len(backbone_nodes)
+      
+      src_list = list(set(self.static.nodes()) - set(self.sinks))
+      
+      d = self.add_capacity(g = d,  src_list= src_list, capacity = self.capacity)
+      r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
+      r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+      
       for c1 in range(total_bnodes-1):
         for c2 in range(c1+1, total_bnodes):
           #print "DEBUG:", c1,c2
           i = backbone_nodes[c1]
           j = backbone_nodes[c2]
           i_j_path, new_node_count = self.find_static_shortest_path(i, j, available_nodes)
+          #print "DEBUG:i_j_path:",i_j_path," new_node_count:",new_node_count
           #print "DEBUG:", c1,c2,i_j_path,new_node_count
           if  new_node_count < 1:
             continue
           #print "DEBUG:(i,j):",i,j
           if i !=j:
             #step i) run max-flow and get the dynamic graph static and compute the residual graph
-            r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
-            r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+            #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', src_list= src_list, capacity = 'capacity')
+            #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
             
             i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
             j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
@@ -530,13 +575,22 @@ class Heuristic_Placement_Algo:
         if self.static.degree(u)+1 > self.static_d_max:
           break 
     return
-
+  
+  def ncr(self,n, r):
+    r = min(r, n-r)
+    if r == 0: return 1
+    numer = reduce(op.mul, xrange(n, n-r, -1))
+    denom = reduce(op.mul, xrange(1, r+1))
+    return numer//denom
 
   def find_static_average_flow(self, num_iterations = 100, source_ratio = 0.05):
+    
+    if   self.avg_max_flow_val and  self.avg_upper_bound_flow_val:
+      return self.avg_max_flow_val, self.avg_upper_bound_flow_val
     print "\t\t@heurisitc placement algo: step: finding static graph avg. flows"
     self.static_avg_flow = 0.0
     self.static_upper_bound_flow = 0.0
-    source_sample_size = int(source_ratio * self.static.number_of_nodes())
+    source_sample_size = int(ceil(source_ratio * self.static.number_of_nodes()))
     
     sample_flow_vals = []
     sample_upper_bound_flow_vals = []
@@ -551,7 +605,10 @@ class Heuristic_Placement_Algo:
       if self.static.has_node(n):
         sink_list.append(n)
         
-    for i in range(num_iterations):
+    pattern_count = self.ncr(self.static.number_of_nodes(), source_sample_size)
+    real_iteration_count = min(pattern_count, num_iterations)
+    
+    for i in range(real_iteration_count):
       #choose source_ratio nodes randomly
       sources = random.sample(allowed_sources,source_sample_size)
       
@@ -572,6 +629,8 @@ class Heuristic_Placement_Algo:
       sample_upper_bound_flow_vals.append( sum(self.static.degree(sources).values()) )
     avg_max_flow_val = mean(sample_flow_vals)
     avg_upper_bound_flow_val = mean(sample_upper_bound_flow_vals)
+    self.avg_max_flow_val =  avg_max_flow_val
+    self.avg_upper_bound_flow_val = avg_upper_bound_flow_val
     return avg_max_flow_val, avg_upper_bound_flow_val
 
   def solve(self):
@@ -592,6 +651,7 @@ class Heuristic_Placement_Algo:
     self.max_flow = r.graph['flow_value']
     
     print "\t@heurisitc placement algo: step iv-b: builidng static graph...."
+    #print "DEBUG: path cache:",self.shortest_path_cache
     self.run_static_step_4()
     #self.print_graph(self.g1)
     static_d = nx.Graph(self.static)
@@ -599,8 +659,14 @@ class Heuristic_Placement_Algo:
     static_d = self.add_capacity(g = static_d, capacity = self.capacity)
     static_r = flow.shortest_augmenting_path(G=static_d, s='src', t='snk', capacity = 'capacity')
     self.static_max_flow = static_r.graph['flow_value']
+    '''
+    print "\t@heurisitc placement algo: step: running max_flow on full adj graph...."
+    full_d = nx.Graph(self.adj)
+    full_d  = self.add_capacity(g = full_d , capacity = self.capacity)
+    full_r = flow.shortest_augmenting_path(G=full_d , s='src', t='snk', capacity = 'capacity')
+    self.full_adj_max_flow = full_r.graph['flow_value']'''
     return
-  
+     
   #def viz_node_colors(self,n):
   #  if n in self.sinks:
   #    return 'g'
