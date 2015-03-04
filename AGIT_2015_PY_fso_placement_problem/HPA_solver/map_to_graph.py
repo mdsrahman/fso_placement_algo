@@ -36,7 +36,7 @@ from  shapely import geometry as shgm
 import geopy.distance
 import numpy as np
 import random
-
+import cPickle as pkl
 import networkx as nx
 import time
 
@@ -438,6 +438,8 @@ class MapToGraph():
     #self.debug_visualize_buildings()
     return self.adj, self.sinks, self.T, self.T_N, self.node, self.tnode
   
+ 
+  
   def generate_visual_map(self, adj = None):
     patches = [] 
     for bldg in self.building:
@@ -479,7 +481,7 @@ class MapToGraph():
 
     if adj:
       for u,v in adj.edges():
-        if self.adj[u][v]['con_type'] == 'short':
+        if str(self.adj[u][v]['con_type']) == 'short':
           edge_color = 'g'
         else:
           edge_color ='b'

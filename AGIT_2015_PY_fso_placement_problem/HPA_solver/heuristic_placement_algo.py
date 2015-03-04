@@ -45,7 +45,7 @@ task 2: run round-robin BFS, till you hit a new
 
 '''
 class Heuristic_Placement_Algo:
-  def __init__(self, capacity, adj, sinks, T , T_N, n_max, static_d_max = 6): #, seed = 101239):
+  def __init__(self, capacity, adj, sinks, T , T_N, n_max, static_d_max = 4): #, seed = 101239):
     #print "initializing Step_1_2_3_4...."
     #random.seed(seed)  
     self.capacity = capacity
@@ -73,6 +73,7 @@ class Heuristic_Placement_Algo:
     
     for n in g.nodes(data=True):
       print n 
+      
     for e in g.edges(data=True):
       print e
       
@@ -106,46 +107,6 @@ class Heuristic_Placement_Algo:
                             L[len(S2)].add(y)
     self.N = deepcopy(E)
     
-  def make_problem_instance(self,
-                            num_node, 
-                            num_edge, 
-                            short_edge_fraction, 
-                            num_sink,
-                            num_target,
-                            max_node_to_target_association,
-                            ):
-    #self.T =  np.zeros(shape = (num_target, num_node), dtype = int)
-    
-    #-----first make a dense connected graph-----------
-    while True: 
-      self.adj = nx.dense_gnm_random_graph(num_node,num_edge)
-      if nx.is_connected(self.adj):
-        break
-    self.adj.graph["name"]="adj_graph"
-    nx.set_edge_attributes(self.adj, 'con_type', 'long') #by default all edges are long edges..
-
-    #---now randomly choose short edges (<100m)------
-    total_short_edges = int(round(short_edge_fraction * self.adj.number_of_edges(), 0))
-    short_edges = random.sample(self.adj.edges(), total_short_edges )
-    for u,v in short_edges:
-      self.adj[u][v]['con_type'] = 'short'
-    '''
-    for edge in self.adj.edges(data = True):
-      print edge
-    '''
-    #------now randomly choose sinks-----------------------
-    self.sinks = random.sample(self.adj.nodes(), num_sink)
-        #-------- randomly hooks targets to source nodes-------
-    #T is the matrix of size num_tarets x num_nodes
-    #self.T =  np.zeros(shape = (num_target, num_node), dtype = bool)
-    self.T=defaultdict(set)
-    self.T_N=defaultdict(list)
-    for t in range(num_target):
-      num_of_assoc_sources = random.randint(1,max_node_to_target_association)
-      assoc_sources = random.sample(self.adj.nodes(),num_of_assoc_sources)
-      for n in assoc_sources:
-        self.T[n].add(t) #node n covers target t
-        self.T_N[t].append(n)
 
   def find_path(self,p,t):
     n = t
@@ -164,7 +125,7 @@ class Heuristic_Placement_Algo:
       #print "DEBUG:S",S
       s_nbr = self.adj.neighbors(s)
       for nbr in s_nbr:
-        if nbr not in S and self.adj[s][nbr]['con_type']=='short':
+        if nbr not in S and str(self.adj[s][nbr]['con_type'])=='short':
           parent_node[nbr] = s
           S.append(nbr)
           if nbr in T:
@@ -231,7 +192,7 @@ class Heuristic_Placement_Algo:
     nbr_s = bfs_successors[n]
     for c in cnodes:
       for nbr in nbr_s:
-        if self.adj.has_edge(c, nbr):
+        if self.adj.has_edge(c, nbr) and str(self.adj[c][nbr]['con_type']) =='short':
           self.G_p.remove_edge(n, nbr)
           self.G_p.add_edge(c, nbr)
           #print "prev_edge:",n,"-",nbr," new edge:",c,"-",nbr
