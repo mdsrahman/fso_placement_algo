@@ -1,15 +1,19 @@
 import networkx as nx
 import networkx.algorithms.flow as flow
-#import numpy as np
+
 import random 
 from collections import defaultdict
-#from babel._compat import iteritems
-#from docutils.parsers.rst.directives import path
+
 from numpy import mean,ceil
+import numpy as np
 from copy import deepcopy
 from operator import itemgetter
-from networkx.algorithms.shortest_paths.generic import all_shortest_paths
+
 import operator as op
+import time
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
 
 
 #import pylab
@@ -45,12 +49,13 @@ task 2: run round-robin BFS, till you hit a new
 
 '''
 class Heuristic_Placement_Algo:
-  def __init__(self, capacity, adj, sinks, T , T_N, n_max, static_d_max = 4): #, seed = 101239):
+  def __init__(self, capacity, adj, sinks, T , T_N, n_max,  static_d_max = 4): #, seed = 101239):
     #print "initializing Step_1_2_3_4...."
     #random.seed(seed)  
     self.capacity = capacity
     self.adj = deepcopy(adj)
     self.sinks = deepcopy(sinks)
+    #self.node= deepcopy(node)
     self.T = deepcopy(T)
     self.T_N = deepcopy(T_N)
     self.G_p = None
@@ -63,6 +68,7 @@ class Heuristic_Placement_Algo:
     self.avg_upper_bound_flow_val = None
     
     self.shortest_path_cache={}
+    self.last_time = time.time()
     
   def print_graph(self, g):
     if 'name' in g.graph.keys():
@@ -299,6 +305,23 @@ class Heuristic_Placement_Algo:
     i_j_path_benefit = min(i_potential, j_potential)/(1.0 * new_node_count)
     return i_j_path_benefit
   
+  def generate_all_node_potential(self, r, nlist):
+    source_potential = {}
+    sink_potential = {}
+    for n in nlist:
+      r1 = flow.shortest_augmenting_path(G=r, s='src',t=n, capacity = 'capacity')
+      snk_p = r1.graph['flow_value']
+      r1 = flow.shortest_augmenting_path(G=r, s=n ,t='snk', capacity = 'capacity')
+      src_p = r1.graph['flow_value']
+      source_potential[n] = src_p
+      sink_potential[n] = snk_p
+    return source_potential, sink_potential
+  
+  def get_time_diff(self, msg):
+    time_t = self.last_time
+    self.last_time = time.time()
+    print"\t\tDEBUG: time elapsed: ", time.time() - time_t," sec: msg:",msg
+  
   def run_step_4(self):
     self.g = self.adj
     self.g1 = deepcopy(self.G_p)
@@ -325,17 +348,17 @@ class Heuristic_Placement_Algo:
     #print available_nodes
     
     iter_counter = 0
+    self.last_time = time.time()
     while(available_nodes and self.g1.number_of_nodes() <= self.n_max):
       iter_counter += 1
       print "\t\tDEBUG: iteration no:",iter_counter,\
         " available nodes:",len(available_nodes),\
         " allowable nodes:",self.n_max - self.g1.number_of_nodes(),\
         " current nodes:",self.g1.number_of_nodes()
-      d = nx.Graph(self.g1)
-      #print "DEBUG:type(d):",type(d)
+      self.get_time_diff(msg = "at the beginning of while loop") #----!!!time diff
       
-      #print "DEBUG:type(d):",type(d)
-      #print d.has_node('src')
+      d = nx.Graph(self.g1)
+      
       max_benefit = - float('inf')
       max_i = max_j = -1
       
@@ -349,23 +372,38 @@ class Heuristic_Placement_Algo:
       d = self.add_capacity(g = d, src_list = src_list, capacity = self.capacity)
       r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
       r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
-      
+      source_potential, sink_potential = self.generate_all_node_potential(r = r, 
+                                                                         nlist = backbone_nodes) 
+      self.get_time_diff(msg = "computed all potential, trapping in i,j loop") #----!!!time diff
       for c1 in range(total_bnodes-1):
+        self.get_time_diff(msg = "current c1:"+str(c1)) #----!!!time diff
+        i = backbone_nodes[c1]
+        i_path_length, i_path = nx.single_source_dijkstra(G = self.adj, source = i, target=None, cutoff=None)
         for c2 in range(c1+1, total_bnodes):
-          i = backbone_nodes[c1]
+          self.get_time_diff(msg = "current c2:"+str(c2)) #----!!!time diff
+          
           j = backbone_nodes[c2]
-          new_nodes_on_i_j_path = self.find_shortest_path_new_nodes(i, j, available_nodes)
-          new_node_count = len(new_nodes_on_i_j_path )
+          #new_nodes_on_i_j_path = self.find_shortest_path_new_nodes(i, j, available_nodes)
+          if j not in i_path_length.keys():
+            continue
+          #i_j_path = nx.dijkstra_path(G = self.adj, source = i, target = j)
+          i_j_path = i_path[j]
+          #j_i_path = list(reversed(i_path[j]))
+          new_nodes_on_i_j_path = [i for i in i_j_path if i in available_nodes]
+          new_node_count = len(new_nodes_on_i_j_path)
+   
           if  new_node_count < 1:
             continue
           #print "DEBUG:(i,j):",i,j
-          if i !=j:
+          if i !=j and not self.g1.has_edge(i, j):
             #step i) run max-flow and get the dynamic graph g1 and compute the residual graph
             #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', src_list = src_list, capacity = 'capacity')
             #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
             
-            i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
-            j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
+            #i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
+            #j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
+            i_j_path_benefit = min(source_potential[i], sink_potential[j])/(1.0 * new_node_count)
+            j_i_path_benefit = min(source_potential[j], sink_potential[i])/(1.0 * new_node_count)
             if i_j_path_benefit > max_benefit:
               max_benefit = i_j_path_benefit
               max_i = i
@@ -386,6 +424,7 @@ class Heuristic_Placement_Algo:
       #print "DEBUG: available_nodes:",available_nodes
       for n in new_node_list:
         self.g1.add_node(n)
+        
         available_nodes.remove(n)
 
       for n in new_node_list: 
@@ -398,7 +437,6 @@ class Heuristic_Placement_Algo:
             if (i,j) not in self.shortest_path_cache.keys():
               self.shortest_path_cache[(i,j)] = list(nx.all_shortest_paths(G=self.g,source=i,target=j))
 
-              
             all_shortest_paths_i_j = list(self.shortest_path_cache[(i,j)])
             #print "DEBUG:@find_static_shortest_path:",all_shortest_paths_i_j
             minimum_node_from_availabe_set = 0
@@ -470,9 +508,15 @@ class Heuristic_Placement_Algo:
       
       src_list = list(set(self.static.nodes()) - set(self.sinks))
       
-      d = self.add_capacity(g = d,  src_list= src_list, capacity = self.capacity)
+      #d = self.add_capacity(g = d,  src_list= src_list, capacity = self.capacity)
+      #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
+      #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+      
+      d = self.add_capacity(g = d, src_list = src_list, capacity = self.capacity)
       r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
       r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+      source_potential, sink_potential = self.generate_all_node_potential(r = r, 
+                                                                         nlist = backbone_nodes)
       
       for c1 in range(total_bnodes-1):
         for c2 in range(c1+1, total_bnodes):
@@ -490,8 +534,11 @@ class Heuristic_Placement_Algo:
             #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', src_list= src_list, capacity = 'capacity')
             #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
             
-            i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
-            j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
+            #i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
+            #j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
+            i_j_path_benefit = min(source_potential[i], sink_potential[j])/(1.0 * new_node_count)
+            j_i_path_benefit = min(source_potential[j], sink_potential[i])/(1.0 * new_node_count)
+            
             if i_j_path_benefit > max_benefit:
               max_benefit = i_j_path_benefit
               max_i = i
@@ -597,11 +644,13 @@ class Heuristic_Placement_Algo:
   def solve(self):
     print "\t@heurisitc placement algo: step i: running greedy target cover...."
     self.greedy_set_cover_targets()
+    self.get_time_diff(msg = "greedy_set_cover_complete") #----!!!time diff
     print "\t@heurisitc placement algo: step ii: building backbone network...."
     self.build_backbone_network()
+    self.get_time_diff(msg = "backbone_network_complete") #----!!!time diff
     print "\t@heurisitc placement algo: step iii: reducing node degree...."
     self.reduce_node_degree()
-    
+    self.get_time_diff(msg = "node_reduction_complete") #----!!!time diff
     print "\t@heurisitc placement algo: step iv-a: builidng dynamic graph...."
     self.run_step_4()
     #self.print_graph(self.g1)
@@ -627,14 +676,6 @@ class Heuristic_Placement_Algo:
     full_r = flow.shortest_augmenting_path(G=full_d , s='src', t='snk', capacity = 'capacity')
     self.full_adj_max_flow = full_r.graph['flow_value']'''
     return
-     
-  #def viz_node_colors(self,n):
-  #  if n in self.sinks:
-  #    return 'g'
-  #  elif n in self.bg.nodes():
-  #    return 'r'
-  #  else: 
-  #    return 'b'
 
  
  

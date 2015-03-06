@@ -31,7 +31,7 @@ tools:
 shapely: object.intersects(other)
 geopy: dist = geopy.distance.distance(pt1, pt2).m
 '''
-import xml.etree.ElementTree as eTree
+import xml.etree.cElementTree as eTree
 from  shapely import geometry as shgm
 import geopy.distance
 import numpy as np
@@ -119,14 +119,18 @@ class MapToGraph():
      
     #node_lat = []
     #node_lon = []
-    
+    coord_counter = 0
     for n in root.iter('node'): # loads all the node lat,lon
       lat[n.attrib['id']] = float(n.attrib['lat'])
       lon[n.attrib['id']] = float(n.attrib['lon'])
+      print "DEBUG: coord_counter:",coord_counter
+      coord_counter += 1
+    print "DEBUG: END OF COORDS-------------"
     
-    
-    
+    way_counter = 0
     for a in root.iter('way'):
+      print "DEBUG: processing way#:",way_counter
+      way_counter += 1
       way[a.attrib['id']]=[]
       for n in a.iter('nd'):
         if n.attrib['ref'] not in lat.keys(): 
@@ -157,8 +161,12 @@ class MapToGraph():
               #else: #take only 4 nodes from the bounding box
             break # careful about this break indentation, it matches within the if{ seqment }
     #print way
+    print "DEBUG: END OF WAY PROCESSING -------------"
     
+    rel_counter = 0
     for a in root.iter('relation'):
+      print "DEBUG: processing relation#:",rel_counter
+      rel_counter += 1
       for c in a.iter('tag'):
           if c.attrib['k'] =='building': #and c.attrib['v'] =='yes':
             building_lat[a.attrib['id']]=[]
@@ -193,7 +201,7 @@ class MapToGraph():
                 break #once the member = outer found no need to iterate further
             break #the building tag is found, no need to iterate on this element
     # save memory now------
-    
+    print "DEBUG: END OF REL- PROCESSING -------------"
     #self.min_lat = float( min( node_lat ) )
     #self.max_lat = float( max( node_lat ) ) 
     #self.min_lon = float( min( node_lon ) )
@@ -436,7 +444,7 @@ class MapToGraph():
     self.select_sinks(sink_ratio = sink_to_node_ratio)
     self.generate_visual_map()#<----just for debugging
     #self.debug_visualize_buildings()
-    return self.adj, self.sinks, self.T, self.T_N, self.node, self.tnode
+    return self.adj, self.sinks, self.T, self.T_N, self.node, self.tnode, self.building 
   
  
   
@@ -492,7 +500,7 @@ class MapToGraph():
     
     ax.autoscale(enable=True, axis = 'both', tight= True)
     ax.set_aspect('equal', 'box')
-    fig.set_size_inches(10, 10)
+    fig.set_size_inches(100, 100)
     fig.savefig(self.mapFileName+".pdf", bbox_inches = 'tight')
     #plt.show()
 
