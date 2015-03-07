@@ -221,9 +221,11 @@ def hash_builidings( building_x, building_y, max_x, max_y, box_x_dist, box_y_dis
   for i in xrange(max_x_index):
     for j in xrange(max_y_index):
       bin_indx = i*(max_x_index -1 )+j
+      print "DEBUG:",bin_indx
       bin_building[bin_indx] = set()
       
   bids =  building_x.keys()
+  print "DEBUG:total bids",len(bids)
   for bid in bids:
     bxs = building_x[bid]
     bys = building_y[bid]
@@ -232,8 +234,8 @@ def hash_builidings( building_x, building_y, max_x, max_y, box_x_dist, box_y_dis
     max_j =  int( max(bys)  // box_y_dist)
     min_j =  int( min(bys)  // box_y_dist)
     #print "DEBUG: max_i, min_i, max_j, min_j:",max_i,min_i,max_j,min_j
-    for i in range(min_i, max_i+1):
-      for j in range(min_j,  max_j+1):
+    for i in range(min_i, max_i):
+      for j in range(min_j,  max_j):
         bin_indx = i*( max_x_index -1 ) + j
         bin_building[bin_indx].add(bid)
         
@@ -519,7 +521,7 @@ if __name__ == '__main__':
   total_nodes = len(node_x)
   print" DEBUG: Binning buildings..."
   bin_building, max_bbin_x, max_bbin_y, bbin_x_interval, bbin_y_interval =\
-  hash_builidings(buildin_x = building_x, 
+  hash_builidings(building_x = building_x, 
                   building_y = building_y, 
                   max_x = max_x, 
                   max_y = max_y, 
