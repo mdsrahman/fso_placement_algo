@@ -208,33 +208,41 @@ def select_nodes(building_x, building_y, interval_dist = 10):
     cnode_y.append(node_y[node_id])
   return cnode_x, cnode_y
   
-def hash_builidings( buildin_x, building_y, max_x, max_y, box_x_dist = 100, box_y_dist = 100):
+def hash_builidings( building_x, building_y, max_x, max_y, box_x_dist, box_y_dist ):
   #total_buildings = len(building_x)
 
-  max_x_index = int(np.ceil(max_x / box_x_dist))
-  max_y_index = int(np.ceil(max_y / box_y_dist))
+  max_x_index = int(max_x // box_x_dist)
+  max_y_index = int(max_y // box_y_dist)
   print "DEBUG:max_x, max_y, box_x_dist, box_y_dist, max_x_index, max_y_index:",\
       max_x, max_y, box_x_dist, box_y_dist, max_x_index, max_y_index
   t = raw_input("press enter")
-  bin_building = defaultdict(dict)
+  
+  bin_building = {}
   for i in xrange(max_x_index):
     for j in xrange(max_y_index):
       bin_indx = i*(max_x_index -1 )+j
       bin_building[bin_indx] = set()
       
-  bids =  buildin_x.keys()
+  bids =  building_x.keys()
   for bid in bids:
-    bxs = buildin_x[bid]
+    bxs = building_x[bid]
     bys = building_y[bid]
-    max_i =  int(( max(bxs) ) // box_x_dist)
-    min_i =  int(( min(bxs) ) // box_x_dist)
-    max_j =  int(( max(bys) ) // box_y_dist)
-    min_j =  int(( min(bys) ) // box_y_dist)
+    max_i =  int( max(bxs)  // box_x_dist)
+    min_i =  int( min(bxs)  // box_x_dist)
+    max_j =  int( max(bys)  // box_y_dist)
+    min_j =  int( min(bys)  // box_y_dist)
     #print "DEBUG: max_i, min_i, max_j, min_j:",max_i,min_i,max_j,min_j
     for i in range(min_i, max_i+1):
       for j in range(min_j,  max_j+1):
-        bin_indx = i*(max_x_index -1 )+j
+        bin_indx = i*( max_x_index -1 ) + j
         bin_building[bin_indx].add(bid)
+        
+  for b in sorted(bin_building.keys()):
+    i = b // box_y_dist
+    j = b% box_y_dist
+    print b, i,j, bin_building[b]
+  t=raw_input("enter:")
+  
   return bin_building, max_x_index, max_y_index, box_x_dist, box_y_dist
 
 
@@ -407,8 +415,8 @@ def calculate_LOS(buildin_x,
     
     n1_bin = n1_bin_x*(bbin_max_x-1)+n1_bin_y
     for j in range(i+1, total_nodes):
-      n2_x = node_x[i]
-      n2_y = node_y[i]
+      n2_x = node_x[j]
+      n2_y = node_y[j]
       n2_bin_x = int(n2_x // bbin_x_interval)
       n2_bin_y = int(n2_y // bbin_x_interval)
       
