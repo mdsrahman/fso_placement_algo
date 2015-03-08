@@ -49,19 +49,19 @@ task 2: run round-robin BFS, till you hit a new
 
 '''
 class Heuristic_Placement_Algo:
-  def __init__(self, capacity, adj, sinks, T , T_N, n_max,  static_d_max = 4): #, seed = 101239):
+  def __init__(self, adj, sinks, T , T_N, static_d_max = 4): #, seed = 101239):
     #print "initializing Step_1_2_3_4...."
     #random.seed(seed)  
-    self.capacity = capacity
-    self.adj = deepcopy(adj)
-    self.sinks = deepcopy(sinks)
+    self.capacity = 1.0
+    self.adj = nx.Graph(adj)
+    self.sinks = list(sinks)
     #self.node= deepcopy(node)
     self.T = deepcopy(T)
     self.T_N = deepcopy(T_N)
     self.G_p = None
     self.g1 = self.G_p # the backbone graph g=(y_i, b_ij)
     self.g =  self.adj # the full graph g1=(x_i, e_ij)
-    self.n_max =  n_max
+    self.n_max =  None
     self.static_d_max = static_d_max
     #self.full_adj_max_flow = None
     self.avg_max_flow_val =  None
@@ -74,7 +74,7 @@ class Heuristic_Placement_Algo:
     if 'name' in g.graph.keys():
       print "graph_name:",g.graph['name']
     print "---------------------------"
-    print "connected:",nx.is_connected(g)
+    #print "connected:",nx.is_connected(g)
     print "num_edges:",g.number_of_edges()
     
     for n in g.nodes(data=True):
@@ -129,6 +129,14 @@ class Heuristic_Placement_Algo:
     P=[]
     for s in S:
       #print "DEBUG:S",S
+      if s not in self.adj.nodes():
+        for k in S:
+          if k not in self.adj.nodes():  
+            print "DEBUG:?? s not in adj:",k
+        print "DEBUG: S:",S 
+        print "DEBUG: T:", T 
+        print "DEBUG: self.sinks:",self.sinks
+        
       s_nbr = self.adj.neighbors(s)
       for nbr in s_nbr:
         if nbr not in S and str(self.adj[s][nbr]['con_type'])=='short':
@@ -232,31 +240,25 @@ class Heuristic_Placement_Algo:
     
     #bfs_successors = nx.bfs_successors(self.G_p, s)
     #self.bg = deepcopy(self.G_p)
+    self.n_max = 2*self.G_p.number_of_nodes()
     return
     #-----------------related to step 4--------------------
-  def add_capacity(self, g, capacity=1.0, src_list=None,  snk_list = None):
+  def add_super_source(self, g, src_list = None):
     if src_list == None: src_list= self.sources
-    if snk_list == None: snk_list=self.sinks
-    
-    g.add_node('src')
-    for i in src_list:
-      g.add_edge('src',i)
-    
-    g.add_node('snk')
-    for i in snk_list:
-      g.add_edge(i,'snk')
-      
+    for n in src_list:
+      g.add_edge('src',n,capacity = float('inf'))
+    return g
+  
+  def add_super_sink(self, g, snk_list = None):
+    if snk_list == None: snk_list= self.sinks
+    for n in snk_list:
+      g.add_edge(n,'snk',capacity = float('inf'))
+    return g
+  
+  def add_capacity(self, g, capacity=1.0):
     edge_set = g.edges()
     for x,y in edge_set:
       g.edge[x][y]['capacity'] = capacity
-      
-    #now override the supersrc-->src capacities and sink-->supersink capacities
-    #self.print_graph(g)
-    for n in src_list:
-      g.edge['src'][n]['capacity'] = float('inf')
-    
-    for n in snk_list:
-      g.edge[n]['snk']['capacity'] = float('inf')
     return g
   
   def compute_residual_graph(self,g, capacity='capacity', flow='flow'):
@@ -266,7 +268,6 @@ class Heuristic_Placement_Algo:
     return g
   
   def find_shortest_path_new_nodes(self, i, j, available_nodes):
-
             if (i,j) not in self.shortest_path_cache.keys():
               self.shortest_path_cache[(i,j)] = list(nx.all_shortest_paths(G=self.g,source=i,target=j))
 
@@ -305,105 +306,163 @@ class Heuristic_Placement_Algo:
     i_j_path_benefit = min(i_potential, j_potential)/(1.0 * new_node_count)
     return i_j_path_benefit
   
-  def generate_all_node_potential(self, r, nlist):
-    source_potential = {}
-    sink_potential = {}
+  def generate_all_node_source_potential(self, r, nlist):
+    source_potential ={}
     for n in nlist:
-      r1 = flow.shortest_augmenting_path(G=r, s='src',t=n, capacity = 'capacity')
-      snk_p = r1.graph['flow_value']
-      r1 = flow.shortest_augmenting_path(G=r, s=n ,t='snk', capacity = 'capacity')
+      source_potential[n] = 0
+    for n in nlist:
+      r1 = nx.DiGraph(r)
+      
+      if r1.has_node('src'):
+        r1.remove_node('src')
+        
+      if not r1.has_node('snk'):
+        r1 = self.add_super_sink(r1, nlist)
+      if r1.has_edge(n,'snk'):
+        r1.remove_edge(n, 'snk')
+        
+      r1 = flow.shortest_augmenting_path(G=r1, s=n ,t='snk', capacity = 'capacity')
       src_p = r1.graph['flow_value']
-      source_potential[n] = src_p
-      sink_potential[n] = snk_p
-    return source_potential, sink_potential
+      '''
+      if src_p == 0:
+        print "src_p ==0!,n:",n
+        self.print_graph(g = r)
+        self.print_graph(g = r1)
+        paths = nx.all_simple_paths(r1,n,'snk')
+        for p in paths:
+          print "\t\tp:",p
+          nx.draw_networkx(r1, with_labels = True)
+          #nx.draw_networkx_edge_labels(r1, nx.spring_layout(r1))
+          plt.show()
+        t_input = raw_input("press enter:")'''
+      if src_p >0:
+        source_potential[n] = src_p 
+    return source_potential
   
-  def get_time_diff(self, msg):
+  def generate_all_node_sink_potential(self, r, nlist):
+    sink_potential ={}
+    for n in nlist:
+      sink_potential[n] = 0
+    for n in nlist:
+      r1 = nx.DiGraph(r)
+      
+      if r1.has_node('snk'):
+        r1.remove_node('snk')
+        
+      if not r1.has_node('src'):
+        r1 = self.add_super_source(r1, nlist)
+      if r1.has_edge('src',n):
+        r1.remove_edge('src',n)
+        
+      r1 = flow.shortest_augmenting_path(G=r1, s='src' ,t=n, capacity = 'capacity')
+      snk_p = r1.graph['flow_value']
+      '''
+      if snk_p == 0:
+        print "snk_p ==0!: n:",n
+        self.print_graph(g = r)
+        self.print_graph(g = r1)
+        paths = nx.all_simple_paths(r1,'src',n)
+        for p in paths:
+          print "\t\tp:",p
+          nx.draw_networkx(r1, with_labels = True)
+          #nx.draw_networkx_edge_labels(r1, nx.spring_layout(r1))
+          plt.show()
+        t_input = raw_input("press enter:")'''
+      if snk_p >0:
+        sink_potential[n] = snk_p
+      
+    return sink_potential
+  
+  def get_time_diff(self, msg = None):
     time_t = self.last_time
     self.last_time = time.time()
-    print"\t\tDEBUG: time elapsed: ", time.time() - time_t," sec: msg:",msg
+    print"\t\tDEBUG: time elapsed: ", time.time() - time_t," ",msg
   
   def run_step_4(self):
     self.g = self.adj
-    self.g1 = deepcopy(self.G_p)
+    self.g1 = nx.Graph(self.G_p)
+    #make it dynamic---##
+    g1_node_list = self.g1.nodes()
+    for u in g1_node_list:
+      for v in g1_node_list:
+        if u!=v and self.adj.has_edge(u, v):
+          self.g1.add_edge(u,v)
     
-    '''#<-- 
-    Given a dynamic graph D, "residual graph" G and super-source S and super-sink T.
-    while (nodes available to add) {
-             For every ORDERED pair of nodes i,j in G
-                Benefit(i,j) =   min(source-potential(i), sink-potential(j)) / newNodesPathLength(i,j)
-             Pick the pair with highest benefit and add nodes on path(i,j) to D (dynamic graph).
-             Also, add any links between nodes already added to D
-             Find the residual graph G again. 
+    print"DEBUG: at the beginning of step_4_static:adj"
+    #nx.draw_networkx(self.adj, with_labels = True)
+    #plt.show()
+    print"DEBUG: at the beginning of step_4"
+    #nx.draw_networkx(self.g1, with_labels = True)
+    #plt.show()
     
-    newLinksPathLength(i,j)
-    This is the shortest length of a path from i to j using only NEW intermediate nodes.
-    
-    Source-potential(i) -- This is the maximum flow from S to i in G.
-    Sink-potential(j) -- This is maximum flow from i to T in G.
-    '''#<--
-    #find set of nodes still available to add to dynamic graph g1 to from input graph g
-    backbone_nodes = self.g1.nodes()
-    #print "DEBUG:backbone_nodes:",backbone_nodes
+      
+    backbone_nodes = list(self.g1.nodes())
     available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
-    #print available_nodes
-    
     iter_counter = 0
     self.last_time = time.time()
+    
     while(available_nodes and self.g1.number_of_nodes() <= self.n_max):
       iter_counter += 1
+      self.get_time_diff()
       print "\t\tDEBUG: iteration no:",iter_counter,\
         " available nodes:",len(available_nodes),\
         " allowable nodes:",self.n_max - self.g1.number_of_nodes(),\
         " current nodes:",self.g1.number_of_nodes()
-      self.get_time_diff(msg = "at the beginning of while loop") #----!!!time diff
+      #t_input = raw_input("press enter:")
+      #self.get_time_diff(msg = "at the beginning of while loop") #----!!!time diff
       
       d = nx.Graph(self.g1)
       
-      max_benefit = - float('inf')
+      max_benefit = 0
       max_i = max_j = -1
       
       new_node_list = None
       
-      backbone_nodes = self.g1.nodes()
+      backbone_nodes = list(self.g1.nodes())
       total_bnodes = len(backbone_nodes)
       
       src_list = list(set(self.g1.nodes()) - set(self.sinks))
       
-      d = self.add_capacity(g = d, src_list = src_list, capacity = self.capacity)
+      d = self.add_capacity(g = d, capacity = self.capacity)
+      d= self.add_super_source(d, src_list = src_list)
+      d = self.add_super_sink(d)
+      
       r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
+      
       r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
-      source_potential, sink_potential = self.generate_all_node_potential(r = r, 
-                                                                         nlist = backbone_nodes) 
-      self.get_time_diff(msg = "computed all potential, trapping in i,j loop") #----!!!time diff
+      
+      source_potential = self.generate_all_node_source_potential(r = r, 
+                                               nlist = backbone_nodes) 
+      sink_potential = self.generate_all_node_sink_potential(r = r, 
+                                             nlist = backbone_nodes) 
       for c1 in range(total_bnodes-1):
-        self.get_time_diff(msg = "current c1:"+str(c1)) #----!!!time diff
         i = backbone_nodes[c1]
-        i_path_length, i_path = nx.single_source_dijkstra(G = self.adj, source = i, target=None, cutoff=None)
+        dg = nx.Graph(self.adj)
+        i_path_length, i_path = nx.single_source_dijkstra(G = dg, source = i, target=None, cutoff=None)
         for c2 in range(c1+1, total_bnodes):
-          self.get_time_diff(msg = "current c2:"+str(c2)) #----!!!time diff
-          
           j = backbone_nodes[c2]
-          #new_nodes_on_i_j_path = self.find_shortest_path_new_nodes(i, j, available_nodes)
           if j not in i_path_length.keys():
+            print "\t\tDEBUG: i-j-disconnected in the adj graph: (i,j):",i,j
+            #print "DEBUG:",i_path_length
             continue
-          #i_j_path = nx.dijkstra_path(G = self.adj, source = i, target = j)
-          i_j_path = i_path[j]
-          #j_i_path = list(reversed(i_path[j]))
-          new_nodes_on_i_j_path = [i for i in i_j_path if i in available_nodes]
+          
+          i_j_path = list(i_path[j])
+          new_nodes_on_i_j_path = [u for u in i_j_path if u in available_nodes]
+          
+          #print "i,j, is_edge",i,j,self.g1.has_edge(i, j)
+          #print "i-j-path:",i_j_path
+          #print "i_src_p, i_snk_p:",source_potential[i], sink_potential[i]
+          #print "j_src_p, j_snk_p:",source_potential[j], sink_potential[j]
+          #print "DEBUG: new_nodes_on_i_j_path:",new_nodes_on_i_j_path
+          
+          #raw_t = raw_input("press enter (inside run-4 i,j loop):")
+          
           new_node_count = len(new_nodes_on_i_j_path)
    
-          if  new_node_count < 1:
-            continue
-          #print "DEBUG:(i,j):",i,j
-          if i !=j and not self.g1.has_edge(i, j):
-            #step i) run max-flow and get the dynamic graph g1 and compute the residual graph
-            #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', src_list = src_list, capacity = 'capacity')
-            #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
-            
-            #i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
-            #j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
+          if  new_node_count >= 1:
             i_j_path_benefit = min(source_potential[i], sink_potential[j])/(1.0 * new_node_count)
             j_i_path_benefit = min(source_potential[j], sink_potential[i])/(1.0 * new_node_count)
+            #print "DEBUG:i_j_path_benefit, j_i_path_benefit ",i_j_path_benefit,j_i_path_benefit
             if i_j_path_benefit > max_benefit:
               max_benefit = i_j_path_benefit
               max_i = i
@@ -414,24 +473,139 @@ class Heuristic_Placement_Algo:
               max_i = j
               max_j = i
               new_node_list = list(new_nodes_on_i_j_path)
-            #t= raw_input("press enter:")
-      #step vi) update graph g1 with new nodes,edges from i,j 
-      #and remove the nodes from list available_nodes
       if max_i == -1:
-        break #no i,j found
-      #otherwise add the paths:
-      #print "DEBUG: new_nodes_added:",new_node_list
-      #print "DEBUG: available_nodes:",available_nodes
+        break 
       for n in new_node_list:
         self.g1.add_node(n)
-        
+        print "\t\tDEBUG@heurisitc_placement_algo..(): adding new node step iv: node",n
         available_nodes.remove(n)
-
+      
       for n in new_node_list: 
         for nbr in self.g[n]:
           if nbr in self.g1.nodes():
             self.g1.add_edge(n,nbr)
+      print "DEBUG: added node:",n
+      #node_color = ['w' if u not in new_node_list else 'g' for u in self.g1.nodes()]
+      #nx.draw_networkx(self.g1, with_labels = True, node_color = node_color)
+      #plt.show()
     return
+  def is_path_valid_for_static_graph(self, path):
+    if len(path)<2:
+      return False
+
+    i = path[0]
+    j = path[-1]
+    
+    i_deg = self.static.degree(i)
+    j_deg = self.static.degree(j)
+    if (self.static_d_max - i_deg) < 1 or (self.static_d_max - j_deg) < 1:
+      return False
+    for n in path[1:-1]:
+      if self.static.has_node(n) and ( self.static_d_max - self.static.degree(n)) < 2:
+        return False
+    return True
+  
+  def run_static_modified_step_4(self):
+    self.g = self.adj
+    self.static = nx.Graph(self.G_p)
+    
+      
+    backbone_nodes = list(self.static.nodes())
+    available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
+    iter_counter = 0
+    self.last_time = time.time()
+    
+    while(available_nodes and self.static.number_of_nodes() <= self.n_max):
+      iter_counter += 1
+      self.get_time_diff()
+      print "\t\tDEBUG: iteration no:",iter_counter,\
+        " available nodes:",len(available_nodes),\
+        " allowable nodes:",self.n_max - self.static.number_of_nodes(),\
+        " current nodes:",self.static.number_of_nodes()
+      d = nx.Graph(self.static)
+      
+      max_benefit = 0
+      max_i = max_j = -1
+      
+      new_node_list = None
+      
+      backbone_nodes = list(self.static.nodes())
+      total_bnodes = len(backbone_nodes)
+      
+      src_list = list(set(self.static.nodes()) - set(self.sinks))
+      
+      d = self.add_capacity(g = d, capacity = self.capacity)
+      d= self.add_super_source(d, src_list = src_list)
+      d = self.add_super_sink(d)
+      
+      r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
+      
+      r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
+      
+      source_potential = self.generate_all_node_source_potential(r = r, 
+                                               nlist = backbone_nodes) 
+      sink_potential = self.generate_all_node_sink_potential(r = r, 
+                                             nlist = backbone_nodes) 
+      for c1 in range(total_bnodes-1):
+        i = backbone_nodes[c1]
+        dg = nx.Graph(self.adj)
+        i_path_length, i_path = nx.single_source_dijkstra(G = dg, source = i, target=None, cutoff=None)
+        for c2 in range(c1+1, total_bnodes):
+          j = backbone_nodes[c2]
+          if j not in i_path_length.keys():
+            print "\t\tDEBUG: i-j-disconnected in the adj graph: (i,j):",i,j
+            #print "DEBUG:",i_path_length
+            continue
+          
+          i_j_path = list(i_path[j])
+          if not self.is_path_valid_for_static_graph(i_j_path):
+            continue
+          new_nodes_on_i_j_path = [u for u in i_j_path if u in available_nodes]
+          
+          new_node_count = len(new_nodes_on_i_j_path)
+   
+          if  new_node_count >= 1:
+            i_j_path_benefit = min(source_potential[i], sink_potential[j])/(1.0 * new_node_count)
+            j_i_path_benefit = min(source_potential[j], sink_potential[i])/(1.0 * new_node_count)
+            #print "DEBUG:i_j_path_benefit, j_i_path_benefit ",i_j_path_benefit,j_i_path_benefit
+            if i_j_path_benefit > max_benefit:
+              max_benefit = i_j_path_benefit
+              max_i = i
+              max_j = j
+              new_node_list = list(new_nodes_on_i_j_path)
+            elif j_i_path_benefit > max_benefit:
+              max_benefit =j_i_path_benefit
+              max_i = j
+              max_j = i
+              new_node_list = list(new_nodes_on_i_j_path)
+      if max_i == -1:
+        break 
+      for n in new_node_list:
+        available_nodes.remove(n)
+      self.static.add_path(i_j_path)
+      
+      
+      #print "DEBUG: added node:",n
+      #node_color = ['w' if u not in new_node_list else 'g' for u in self.static.nodes()]
+      #nx.draw_networkx(self.static, with_labels = True, node_color = node_color)
+      #plt.show()
+      
+    static_nodes = self.static.nodes()
+    len_static_nodes = len(static_nodes)
+    for uindx in range(len_static_nodes - 1):
+      u = static_nodes[uindx]
+      if self.static.degree(u)+1 > self.static_d_max:
+        continue
+      for vindx in range(uindx+1, len_static_nodes):
+        v= static_nodes[vindx]
+        if self.static.degree(v)+1 > self.static_d_max:
+          continue
+        if self.adj.has_edge(u,v):
+          self.static.add_edge(u,v)
+        if self.static.degree(u)+1 > self.static_d_max:
+          break 
+    return
+
   
   def find_static_shortest_path(self, i, j, available_nodes):
             if (i,j) not in self.shortest_path_cache.keys():
@@ -442,9 +616,6 @@ class Heuristic_Placement_Algo:
             minimum_node_from_availabe_set = 0
             min_path = []
             for p in all_shortest_paths_i_j:
-              #print "DEBUG:p:",p
-              #print "DEBUG:available_set:",available_nodes
-              #first check degree constraint
               invalid_path = False
               for nindx, n in enumerate(p):
                 if n in self.static.nodes():
@@ -462,12 +633,8 @@ class Heuristic_Placement_Algo:
               if available_node_count > minimum_node_from_availabe_set:
                 minimum_node_from_availabe_set = available_node_count
                 min_path = p
-              #find the minimum number of external-node shortest paths
-              
-            #i_j_path = nx.shortest_path(self.g, i, j)
             
             i_j_path = min_path
-            #print "DEBUG: i_j_path: ",i_j_path
             if len(i_j_path)<=2: 
               return [], 0
             new_nodes_on_i_j_path = []
@@ -477,65 +644,50 @@ class Heuristic_Placement_Algo:
             return i_j_path, len(new_nodes_on_i_j_path)
   
   def run_static_step_4(self):
-    #print "DEBUG: running run_static_step_4()....."
-    self.g = self.adj
-    self.static = deepcopy(self.G_p)
-    #find set of nodes still available to add to dynamic graph static to from input graph g
-    backbone_nodes = self.static.nodes()
-    #print "DEBUG:backbone_nodes:",backbone_nodes
-    available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
-    #print available_nodes
     
+    self.g = self.adj
+    self.static = nx.Graph(self.G_p)
+    
+    backbone_nodes = list(self.static.nodes())
+
+    available_nodes = list(set(self.g.nodes()) - set(backbone_nodes))
+
     iter_counter = 0
     while(available_nodes and self.static.number_of_nodes() <= self.n_max):
       iter_counter += 1
+      self.get_time_diff()
       print "\t\tDEBUG: iteration no:",iter_counter,\
         " available nodes:",len(available_nodes),\
         " allowable nodes:",self.n_max - self.static.number_of_nodes(),\
         " current nodes:",self.static.number_of_nodes() 
-      #print "DEBUG: Available nodes:",len(available_nodes),\
-      #      " current nodes:",self.static.number_of_nodes(),"------"
       d = nx.Graph(self.static)
-      #print "DEBUG:type(d):",type(d)
-      
-      #print "DEBUG:type(d):",type(d)
-      #print d.has_node('src')
-      max_benefit = - float('inf')
+      max_benefit = 0.0
       max_i = max_j = -1
-      #new_node_list = None
+ 
       backbone_nodes = self.static.nodes()
       total_bnodes = len(backbone_nodes)
       
       src_list = list(set(self.static.nodes()) - set(self.sinks))
-      
-      #d = self.add_capacity(g = d,  src_list= src_list, capacity = self.capacity)
-      #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
-      #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
-      
-      d = self.add_capacity(g = d, src_list = src_list, capacity = self.capacity)
+      d = self.add_capacity(g = d,capacity = self.capacity)
+      d = self.add_super_source(d, src_list = src_list)
+      d= self.add_super_sink(d)
       r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
       r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
-      source_potential, sink_potential = self.generate_all_node_potential(r = r, 
-                                                                         nlist = backbone_nodes)
-      
+      source_potential = self.generate_all_node_source_potential(r = r, 
+                                                                nlist = backbone_nodes)
+      sink_potential = self.generate_all_node_sink_potential(r = r, 
+                                                          nlist = backbone_nodes)
+      print "DEBUG:@step-4:src_pot:",source_potential
+      print "DEBUG:@step-4:snk_pot:",sink_potential
+
       for c1 in range(total_bnodes-1):
+        i = backbone_nodes[c1]
         for c2 in range(c1+1, total_bnodes):
-          #print "DEBUG:", c1,c2
-          i = backbone_nodes[c1]
           j = backbone_nodes[c2]
           i_j_path, new_node_count = self.find_static_shortest_path(i, j, available_nodes)
-          #print "DEBUG:i_j_path:",i_j_path," new_node_count:",new_node_count
-          #print "DEBUG:", c1,c2,i_j_path,new_node_count
           if  new_node_count < 1:
             continue
-          #print "DEBUG:(i,j):",i,j
           if i !=j:
-            #step i) run max-flow and get the dynamic graph static and compute the residual graph
-            #r = flow.shortest_augmenting_path(G=d, s='src', t='snk', src_list= src_list, capacity = 'capacity')
-            #r = self.compute_residual_graph(g=r, capacity = 'capacity', flow='flow')
-            
-            #i_j_path_benefit = self.find_path_benefit(r, i, j, new_node_count)
-            #j_i_path_benefit = self.find_path_benefit(r, j, i, new_node_count)
             i_j_path_benefit = min(source_potential[i], sink_potential[j])/(1.0 * new_node_count)
             j_i_path_benefit = min(source_potential[j], sink_potential[i])/(1.0 * new_node_count)
             
@@ -548,32 +700,20 @@ class Heuristic_Placement_Algo:
               max_benefit =j_i_path_benefit
               max_i = j
               max_j = i
-              #print  "\t\tDEBUG: i_j_path", list(reversed(i_j_path))
               max_i_j_path  = list(reversed(i_j_path))
-            #t= raw_input("press enter:")
-      #step vi) update graph static with new nodes,edges from i,j 
-      #and remove the nodes from list available_nodes
       if max_i == -1:
-        break #no i,j found
-      #otherwise add the paths:
-      #print "DEBUG: new_nodes_added:",new_node_list
-      #print "DEBUG: available_nodes:",available_nodes
-      #else add the path to the static graph
+        break 
       for n in max_i_j_path:
         if n in available_nodes:
           available_nodes.remove(n)
       self.static.add_path(max_i_j_path)
-
-    #now check for the less-degree nodes 
+ 
     static_nodes = self.static.nodes()
     len_static_nodes = len(static_nodes)
-    #print "DEBUG: processing single edge addition..."
     for uindx in range(len_static_nodes - 1):
-      #print "DEBUG: uindx:",uindx
       u = static_nodes[uindx]
       if self.static.degree(u)+1 > self.static_d_max:
         continue
-      #edge_created = True 
       for vindx in range(uindx+1, len_static_nodes):
         v= static_nodes[vindx]
         if self.static.degree(v)+1 > self.static_d_max:
@@ -627,9 +767,9 @@ class Heuristic_Placement_Algo:
       #print "DEBUG:@find_static_average_flow(): static_d src_list:",sources
 
       static_d = self.add_capacity(g = static_d, 
-                                   capacity = self.capacity, 
-                                   src_list = sources,
-                                   snk_list= sink_list)
+                                   capacity = self.capacity)
+      static_d = self.add_super_source(static_d, sources)
+      static_d = self.add_super_sink(static_d, sink_list)
       #print "DEBUG:s-t path:", [p for p in nx.all_shortest_paths(G=static_d,source='src',target='snk')]
       static_r = flow.shortest_augmenting_path(G=static_d, s='src', t='snk', capacity = 'capacity')
       #set avg_flow and upper_bound_flows
@@ -645,36 +785,42 @@ class Heuristic_Placement_Algo:
     print "\t@heurisitc placement algo: step i: running greedy target cover...."
     self.greedy_set_cover_targets()
     self.get_time_diff(msg = "greedy_set_cover_complete") #----!!!time diff
+    
     print "\t@heurisitc placement algo: step ii: building backbone network...."
     self.build_backbone_network()
     self.get_time_diff(msg = "backbone_network_complete") #----!!!time diff
+    
     print "\t@heurisitc placement algo: step iii: reducing node degree...."
     self.reduce_node_degree()
     self.get_time_diff(msg = "node_reduction_complete") #----!!!time diff
+    
+    
     print "\t@heurisitc placement algo: step iv-a: builidng dynamic graph...."
     self.run_step_4()
-    #self.print_graph(self.g1)
     d = nx.Graph(self.g1)
-      #print "DEBUG:type(d):",type(d)
     d = self.add_capacity(g = d, capacity = self.capacity)
+    d = self.add_super_source(d)
+    d= self.add_super_sink(d)
     r = flow.shortest_augmenting_path(G=d, s='src', t='snk', capacity = 'capacity')
     self.max_flow = r.graph['flow_value']
     
+    
+    
     print "\t@heurisitc placement algo: step iv-b: builidng static graph...."
-    #print "DEBUG: path cache:",self.shortest_path_cache
-    self.run_static_step_4()
-    #self.print_graph(self.g1)
+    self.run_static_modified_step_4()
     static_d = nx.Graph(self.static)
-      #print "DEBUG:type(d):",type(d)
     static_d = self.add_capacity(g = static_d, capacity = self.capacity)
+    static_d = self.add_super_source(static_d)
+    static_d= self.add_super_sink(static_d)
     static_r = flow.shortest_augmenting_path(G=static_d, s='src', t='snk', capacity = 'capacity')
     self.static_max_flow = static_r.graph['flow_value']
-    '''
-    print "\t@heurisitc placement algo: step: running max_flow on full adj graph...."
-    full_d = nx.Graph(self.adj)
-    full_d  = self.add_capacity(g = full_d , capacity = self.capacity)
-    full_r = flow.shortest_augmenting_path(G=full_d , s='src', t='snk', capacity = 'capacity')
-    self.full_adj_max_flow = full_r.graph['flow_value']'''
+    
+    
+    #nx.draw_networkx(self.g1, with_labels = True, node_color = 'w', label ="Dyanmic Graph")
+    #plt.show()
+    
+    #nx.draw_networkx(self.static, with_labels = True, node_color = 'w', label ="Static Graph")
+    #plt.show()
     return
 
  
